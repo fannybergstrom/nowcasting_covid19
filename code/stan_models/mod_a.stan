@@ -1,6 +1,6 @@
 // Model description:
 // Perform Bayesian hierarchical Nowcast with log-linear model for 
-// log(lambda_{t}) = N(beta_0 + beta_1*lambda_{t-1}, sigma), 
+// log(lambda_{t}) = N(lambda_{t-1}, sigma), 
 // model observed case counts n_{t,d} ~ NB(lambda[t]*p_{t,d}, phi), 
 // with phi over-dispersion
 // delay distribution: Discrete time-hazard model with week-day effects
@@ -24,8 +24,6 @@ parameters {
   vector[T] epsilon;   // Error log-linear model (scaled by sigma)
   // epi-curve model
   real<lower=0, upper=2> sigma; // Variance parameter for random walk
-  real beta_0; // Intercept
-  real beta_1; // Association coefficient
   // reporting model
   // week-day effect
   vector[k_wd_haz] beta_wd_haz;       
@@ -62,7 +60,7 @@ transformed parameters {
   p[, D] = 1 -  (p[, 1:(D-1)] * rep_vector(1, D-1));
   // log-lambda
   for(t in 1:T) {
-    logLambda[t] = beta_0 + beta_1*logLambda[t-1] + sigma*epsilon[t]; // Derive logLambda from non-centered parametrization
+    logLambda[t] = logLambda[t-1] + sigma*epsilon[t]; // Derive logLambda from non-centered parametrization
   }
   // Overdispersion
   phi = 1 / reciprocal_phi;
@@ -81,8 +79,6 @@ model {
   beta_wd_haz ~ normal(0, sd_beta_wd_haz);
 
   // log-Lambda
-  beta_0 ~ normal(0,2);
-  beta_1 ~ normal(0,0.5);
   epsilon ~ std_normal();
   // Model for observed counts
   

@@ -19,6 +19,8 @@ rep_dates <- dat %>%
   as.vector()
 
 
+now <- ymd("2021-05-20")
+
 FHM_ICU <- read_excel(paste0("../data/FoHM/Folkhalsomyndigheten_Covid19_", now, ".xlsx"),
   sheet = "Antal intensivvårdade per dag"
 )
@@ -27,7 +29,6 @@ FHM_cases <- read_excel(paste0("../data/FoHM/Folkhalsomyndigheten_Covid19_", now
   sheet = "Antal per dag region"
 ) %>% select(Statistikdatum, Totalt_antal_fall)
 
-now <- ymd("2021-05-20")
 
 dat_mod <- dat %>%
   filter(rep_date <= now)
@@ -56,20 +57,13 @@ ts <- FHM_ICU %>%
     date >= start
   )
 
+
 prepare_data_list <- function(dat,
                               now,
                               begin_date = start,
                               D = D_max) {
   # Nowcast dates range
   nc_range <- range(begin_date, now)
-
-  sts <- linelist2sts(
-    as.data.frame(dat),
-    dateCol = "death_date",
-    aggregate.by = "1 day",
-    dRange = nc_range
-  )
-
 
   # Reporting triangle
   cat("Building reporting triangle...\n")
@@ -85,10 +79,10 @@ prepare_data_list <- function(dat,
   }
   dat <- dat %>% mutate(delay = rep_date - death_date)
 
-  for (t in 1:T) {
-    data.att <- dat[which(dat$death_date == t02s[t]), ]
-    for (d in 1:(T - t - 1)) {
-      n[t, d] <- sum(data.att$delay == d)
+  for (t in 0:T) {
+    data.att <- dat[which(dat$death_date == t02s[t + 1]), ]
+    for (d in 1:(T - t)) {
+      n[t + 1, d] <- sum(data.att$delay == d)
     }
   }
   cat("No. cases: ", sum(n, na.rm = TRUE), "\n")
@@ -194,6 +188,7 @@ prepare_data_list <- function(dat,
     ),
     t02s = t02s,
     Z = Z,
+    x = ts$ratio_i
   )
 }
 
@@ -202,7 +197,7 @@ prep_dat_list <- prepare_data_list(
   dat = dat_mod,
   now = now,
   begin_date = start,
-  D = D_max # maximum delay 35 days
+  D = D_max # maximum delay
 )
 
 mod_b <- cmdstanr::cmdstan_model("./stan_models/mod_b.stan")
@@ -243,18 +238,15 @@ samples$summary("N") %>%
   geom_line(aes(date, exp), lty = 2) +
   geom_line(aes(date, truth), col = "green", lty = 2)
 
-
-
-
 samples$draws("N")
 
 N_draws <- samples$draws("N[1]")[, , 1]
 N_draws
 
 # Save results
-save_res <- c("N", "p", "p_d1_pr", "beta_1", "beta_0", "logLambda")
-for (i in 1:length(save_res)) {
-  write_csv(as.data.frame(res_m1[save_res[i]]), file = paste0("../results/", save_res[i], "/", save_res[i], "_", model, "_", start, "_now_", now, ".csv"))
-}
+#save_res <- c("N", "p", "p_d1_pr", "beta_1", "beta_0", "logLambda")
+#for (i in 1:length(save_res)) {
+#  write_csv(as.data.frame(res_m1[save_res[i]]), file = paste0("../results/", save_res[i], "/", save_res[i], "_", model, "_", start, "_now_", now, ".csv"))
+#}
 
-samples$draws[1:25, c(1, 3), 1]
+

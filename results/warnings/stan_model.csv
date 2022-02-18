@@ -1,4 +1,2 @@
 .
-"All chains finished unexpectedly! Use the $output(chain_id) method for more information.
-"
-No chains finished successfully. Unable to retrieve the fit.
+Removed 3 rows containing missing values (position_stack).

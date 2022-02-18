@@ -29,7 +29,6 @@ FHM_cases <- read_excel(paste0("../data/FoHM/Folkhalsomyndigheten_Covid19_", now
   sheet = "Antal per dag region"
 ) %>% select(Statistikdatum, Totalt_antal_fall)
 
-
 dat_mod <- dat %>%
   filter(rep_date <= now)
 # Estimate nowcast model based on the previous 8 weeks
@@ -42,9 +41,9 @@ ts <- FHM_ICU %>%
   select(date = Datum_vårdstart, n_icu = Antal_intensivvårdade) %>%
   left_join(FHM_cases %>% select(date = Statistikdatum, n_cases = Totalt_antal_fall)) %>%
   mutate(
-    sum_7_c = rollsum(n_cases, k = 7, fill = NA, align = "right"),
+    sum_7_c = rollmean(n_cases, k = 7, fill = NA, align = "right"),
     sum_7_c_lag = lag(sum_7_c, k = 7, fill = NA),
-    sum_7_i = rollsum(n_icu, k = 7, fill = NA, align = "right"),
+    sum_7_i = rollmean(n_icu, k = 7, fill = NA, align = "right"),
     sum_7_i_lag = lag(sum_7_i, k = 7, fill = NA),
     diff_sum7_i = as.numeric(diff(as.zoo(sum_7_i), lag = 7, na.pad = T)),
     sum_7_log_i = log(rollsum(n_icu, k = 7, fill = NA, align = "right")),
@@ -54,9 +53,10 @@ ts <- FHM_ICU %>%
   ) %>%
   filter(
     date <= now,
-    date >= start
+    date >= start-1
   )
 
+lead_ind <- ts$sum_7_i_lag
 
 prepare_data_list <- function(dat,
                               now,
@@ -188,7 +188,6 @@ prepare_data_list <- function(dat,
     ),
     t02s = t02s,
     Z = Z,
-    x = ts$ratio_i
   )
 }
 
@@ -240,8 +239,31 @@ samples$summary("N") %>%
 
 samples$draws("N")
 
-N_draws <- samples$draws("N[1]")[, , 1]
-N_draws
+N_draws <- samples$draws("N")
+
+df <- N_draws %>% as.data.frame() %>% gather(N1, ends_with("N[1]")) %>% 
+  gather(loop_number, Q3.3, starts_with("Q3.3")) %>%
+  mutate(loop_number = str_sub(loop_number,-2,-2))
+
+
+df %>%
+  gather(key, value) %>% 
+  mutate(key = str_remove(key, "..")) %>% 
+  pivot_wider(value, key) %>% flatten() %>% as.data.frame()
+
+N1 <- df1[1,1]$`N[1]`
+
+  
+  library(dplyr)
+  stocks <- data.frame(
+    time = as.Date('2009-01-01') + 0:9,
+    X = rnorm(10, 0, 1),
+    Y = rnorm(10, 0, 2),
+    Z = rnorm(10, 0, 4)
+  )
+  stocksm <- stocks %>% gather(stock, price, -time)
+  stocksm %>% spread(stock, price)
+  stocksm %>% spread(time, price)
 
 # Save results
 #save_res <- c("N", "p", "p_d1_pr", "beta_1", "beta_0", "logLambda")

@@ -237,38 +237,21 @@ samples$summary("N") %>%
   geom_line(aes(date, exp), lty = 2) +
   geom_line(aes(date, truth), col = "green", lty = 2)
 
-samples$draws("N")
+samples$draws("beta_1") 
 
-N_draws <- samples$draws("N")
-
-df <- N_draws %>% as.data.frame() %>% gather(N1, ends_with("N[1]")) %>% 
-  gather(loop_number, Q3.3, starts_with("Q3.3")) %>%
-  mutate(loop_number = str_sub(loop_number,-2,-2))
-
-
-df %>%
-  gather(key, value) %>% 
-  mutate(key = str_remove(key, "..")) %>% 
-  pivot_wider(value, key) %>% flatten() %>% as.data.frame()
+df <- 
 
 N1 <- df1[1,1]$`N[1]`
 
-  
-  library(dplyr)
-  stocks <- data.frame(
-    time = as.Date('2009-01-01') + 0:9,
-    X = rnorm(10, 0, 1),
-    Y = rnorm(10, 0, 2),
-    Z = rnorm(10, 0, 4)
-  )
-  stocksm <- stocks %>% gather(stock, price, -time)
-  stocksm %>% spread(stock, price)
-  stocksm %>% spread(time, price)
-
+model <- "test"
 # Save results
-#save_res <- c("N", "p", "p_d1_pr", "beta_1", "beta_0", "logLambda")
-#for (i in 1:length(save_res)) {
-#  write_csv(as.data.frame(res_m1[save_res[i]]), file = paste0("../results/", save_res[i], "/", save_res[i], "_", model, "_", start, "_now_", now, ".csv"))
-#}
+save_res <- c("N", "p", "beta_1", "beta_0", "logLambda")
+for (i in 1:length(save_res)) {
+  samples$draws(save_res[i]) %>% as.data.frame() %>%
+    gather(key, value) %>% 
+    mutate(key = str_remove(key, "..")) %>% 
+    pivot_wider(value, key, values_fn = list) %>% flatten() %>% as.data.frame() %>% 
+    write_csv(file = paste0("../results/", save_res[i], "/", save_res[i], "_", model, "_", start, "_now_", now, ".csv"))
+}
 
 

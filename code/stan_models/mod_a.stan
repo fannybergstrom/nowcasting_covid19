@@ -3,9 +3,9 @@
 // log(lambda_{t}) = N(log(lambda_{t-1}), sigma), 
 // model observed case counts n_{t,d} ~ NB(lambda[t]*p_{t,d}, phi), 
 // with phi over-dispersion
-// delay distribution: Discrete time-hazard model with week-day effects
+// Delay distribution: Discrete time-hazard model with week-day effects
 data {
-  // data
+  // Data
   int T;              // Number of rows in reporting triangle 
   int D;              // Maximum delay and number of columns of reporting triangle'
   int r[T, D];   // Reporting triangle (Excluding zero delay)
@@ -15,8 +15,6 @@ data {
   // prior parameter
   vector[D] alpha;  // Parameters of Dirichlet prior for baseline delay distribution
 }
-
-
 
 parameters {
   simplex[D] p_bl_pr; // delay probabilities
@@ -63,8 +61,8 @@ model {
   sigma ~ normal(0, .5); // scale of the error-term
   // Random walk
   logLambda[1] ~ normal(0, 3);
-  for(t in 1:T) {
-    logLambda[t] ~ normal(logLambda[t-1], sigma*epsilon[t]);
+  for(t in 2:T) {
+    logLambda[t] ~ normal(logLambda[t-1], sigma);
   }
   // Reporting delay
   // Hyper-prior

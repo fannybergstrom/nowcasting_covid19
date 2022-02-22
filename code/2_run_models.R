@@ -190,9 +190,10 @@ evaluate_nowcast <- function(model, now) {
     D = D_max # maximum delay
   )
 
-  mod_b <- cmdstanr::cmdstan_model(paste0("./stan_models/", model, ".stan"))
-
-  samples <- mod_b$sample(
+  mod <- cmdstanr::cmdstan_model(paste0("./stan_models/", model, ".stan"))
+  
+  
+  samples <- mod$sample(
     data = list(
       T = prep_dat_list$T,
       D = prep_dat_list$maxDelay,
@@ -213,7 +214,7 @@ evaluate_nowcast <- function(model, now) {
     as.data.frame() %>%
     write_csv(paste0("../results/warnings/", model, "_", now, ".csv"))
 
-  samples$summary(c("beta_0", "beta_1", "phi", "sigma", "N")) %>%
+  samples$summary(c("phi", "sigma", "N", "beta_0", "beta_1")) %>%
     as.data.frame() %>%
     write_csv(paste0("../results/summary/", model, "_", now, ".csv"))
 
@@ -238,6 +239,6 @@ rep_dates <- dat %>%
   t() %>%
   as.vector()
 
-date <- ymd("2021-01-08") #rep_dates[20]
+date <- rep_dates[20]
 model <- "mod_b"
 evaluate_nowcast(model, date)

@@ -12,8 +12,6 @@ setwd("~/Documents/GitHub/nowcasting_covid19/code")
 # Import data
 dat <- read_csv("../data/covid_deaths.csv")
 
-now <- "2022-02-15"
-model <- "mod_a"
 
 evaluate_nowcast <- function(model, now) {
 
@@ -46,7 +44,7 @@ evaluate_nowcast <- function(model, now) {
       lead_ind_icu = log(lag(mean_7_i, k = 10, fill = NA)),
       mean_7_i_lag = lag(mean_7_i, k = 10, fill = NA),
       diff_mean7_i = as.numeric(diff(as.zoo(mean_7_i), lag = 7, na.pad = T)),
-      ratio_i = log(lag(mean_7_i / mean_7_i_lag, 7)),
+      ratio_i = lag(log(lag(mean_7_i / mean_7_i_lag, 7)), k = 4),
       ratio_c = log(lag(mean_7_c / mean_7_c_lag, 7))
     ) %>%
     filter(
@@ -371,13 +369,13 @@ evaluate_nowcast <- function(model, now) {
 # Restrict dataset to a specific nowcast date
 rep_dates <- dat %>%
   select(rep_date) %>%
-  filter(rep_date >= "2020-10-01", rep_date <= "2021-05-31") %>%
+  filter(rep_date >= "2020-10-01") %>%  #, rep_date <= "2021-05-31")  %>%
   distinct() %>%
   t() %>%
   as.vector()
 
-for(i in 81:128){
+for(i in 70:72){
 date <- rep_dates[i]
-model_spec <- "mod_a_cp"
+model_spec <- "mod_d_cp"
 lapply(model_spec , evaluate_nowcast, date)
 }

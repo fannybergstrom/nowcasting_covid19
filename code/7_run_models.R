@@ -252,7 +252,7 @@ evaluate_nowcast <- function(model, now) {
       ),
       seed = 1142,
       chains = 4,
-      adapt_delta = 0.9,
+      adapt_delta = 0.95,
       parallel_chains = 4
     )
     save_res <- c("N", "p", "beta_0", "beta_1", "logLambda")
@@ -369,13 +369,13 @@ evaluate_nowcast <- function(model, now) {
 # Restrict dataset to a specific nowcast date
 rep_dates <- dat %>%
   select(rep_date) %>%
-  filter(rep_date >= "2020-10-01") %>%  #, rep_date <= "2021-05-31")  %>%
-  distinct() %>%
+  filter(rep_date >= "2020-09-15") %>%  #, rep_date <= "2021-05-31")  %>%
+  distinct() %>% 
   t() %>%
   as.vector()
 
-for(i in 70:72){
+for(i in 10:1){
 date <- rep_dates[i]
-model_spec <- "mod_d_cp"
+model_spec <- "mod_c_cp"
 lapply(model_spec , evaluate_nowcast, date)
 }

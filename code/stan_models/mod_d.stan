@@ -63,9 +63,9 @@ model {
   // Priors
   sigma ~ normal(0, .5); // scale of the error-term
   // Random walk
-  logLambda[1] ~ normal(0, 3);
+  logLambda[1] ~ normal(0, 3) + beta_1 * lead_ind[1];
   for(t in 2:T) {
-    logLambda[t] ~ normal(beta_0 * logLambda[t-1] + beta_1 * lead_ind[t-1], sigma);
+    logLambda[t] ~ normal(beta_0 * logLambda[t-1] + beta_1 * lead_ind[t], sigma);
   }
   // Reporting delay
   // Hyper-prior

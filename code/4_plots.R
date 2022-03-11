@@ -62,37 +62,8 @@ dat %>% filter(rep_date <= now) %>%
   mutate(n_death=replace_na(n_death, 0)) %>%
   left_join(ts %>% select(date, sum_7_i_lag)) %>% ggplot() + geom_line(aes(date, n_death)) + geom_line(aes(date, sum_7_i_lag/7))
 
-fig_a <- read_csv(paste0("../results/summary/", "mod_b_cp", "_", date, ".csv")) %>% 
-  filter(str_detect(variable, "N\\[") ) %>%
-  #cbind(tibble(date = seq(now-D_max +1, now, "1 day"))) %>%
-  cbind(tibble(date = seq(start, now, "1 day"))) %>%
-  left_join(dat %>% group_by(date = death_date) %>% summarise(truth = n())) %>%
-  left_join(dat %>% filter(rep_date <= now) %>% group_by(date = death_date) %>%
-              summarise(reported = n())) %>% 
-  ggplot() +
-  geom_col(aes(date, reported)) +
-  geom_line(aes(date, median)) +
-  geom_ribbon(aes(date, ymin = q5, ymax = q95), alpha = .2) +
-  geom_line(aes(date, truth), col = "green", lty = 2)
 
-fig_b <- read_csv(paste0("../results/summary/", "mod_a", "_", date, ".csv")) %>% 
-  filter(str_detect(variable, "N\\[") ) %>%
-  #cbind(tibble(date = seq(now-D_max +1, now, "1 day"))) %>%
-  cbind(tibble(date = seq(start, now, "1 day"))) %>%
-  left_join(dat %>% group_by(date = death_date) %>% summarise(truth = n())) %>%
-  left_join(dat %>% filter(rep_date <= now) %>% group_by(date = death_date) %>%
-              summarise(reported = n())) %>% 
-  ggplot() +
-  geom_col(aes(date, reported)) +
-  geom_line(aes(date, median)) +
-  geom_ribbon(aes(date, ymin = q5, ymax = q95), alpha = .2) +
-  geom_line(aes(date, truth), col = "green", lty = 2)
-
-ggarrange(fig_a, fig_b)
-
-ggarrange(fig_a, fig_c)
-
-relative_error_rep_plot <-  err_df %>% 
+relative_error_rep_plot <-  res_df %>% 
   na.omit() %>% 
   ggplot(aes(x = date)) +
   geom_line(aes(y = rel_a, color = "Random walk")) +
@@ -112,33 +83,31 @@ relative_error_rep_plot <-  err_df %>%
 ggsave(paste0("../plots/rel_plot.png"), relative_error_rep_plot, width = 6,
        height = 4)
 max_delay <- 0
-err_df %>% 
+res_df %>% 
   summarize(mean_a = mean(err_a), mean_b = mean(err_b), mean_c = mean(err_c)#, mean_d = mean(err_d)
   )
 
 
-rmse_plot <- err_df %>% 
+rmse_plot <- res_df %>% 
   ggplot(aes(x = date)) +
-  geom_line(aes(y = err_a, color = "Random walk")) +
-  geom_line(aes(y = err_b, color = "LS ICU"), linetype = 2) +
-  geom_line(aes(y = err_c, color = "Lead signal ases)"), linetype = 4) +
-  #   geom_line(aes(y = err_d, color = "RW + Lead signal (ICU)"), linetype = 3) +
+  geom_line(aes(y = err_a, color = "RW"), linetype = 2) +
+  geom_line(aes(y = err_b, color = "LS ICU"), linetype = 1) +
+  geom_line(aes(y = err_c, color = "LS Cases+ICU"), linetype = 4) +
   ylab("RMSE") +
   xlab("Date") +
-  scale_x_date(date_breaks = "2 weeks", date_labels = "%y-%m-%d") +
+  scale_x_date(date_breaks = "1 month", date_labels = "%y-%m-%d") +
   theme(legend.background = element_blank(),
         legend.position = c(0.9, 0.97),
         legend.justification = c("right", "top"),
-        legend.title = element_blank())#+
-scale_color_manual(values = c("Random Walk" = wes_cols[4], "Lead signal (ICU)" = wes_cols[2], 
-#  "RW + Lead signal (ICU)" = wes_cols[5]))
+        legend.title = element_blank())+
+      scale_color_manual(values = c("RW" = wes_cols[4], "LS ICU" = wes_cols[5], "LS Cases+ICU" = wes_cols[6]))
 rmse_plot
-ggsave(paste0("../plots/rmse.png"), rmse_plot, width = 6,
-       height = 4)
+ggsave(paste0("../plots/rmse.png"), rmse_plot, width = 4,
+       height = 3)
 
 
 
-log_plot <-err_df %>% filter(date != "2021-02-02",  date < "2021-06-22") %>% 
+log_plot <-res_df %>% filter(date != "2021-02-02",  date < "2021-06-22") %>% 
   ggplot(aes(x = as.Date(date))) +
   geom_line(aes(y = log_a, color = "RW"),linetype = 2) +
   geom_line(aes(y = log_b, color = "LS ICU"),linetype = 1) +
@@ -153,14 +122,14 @@ log_plot <-err_df %>% filter(date != "2021-02-02",  date < "2021-06-22") %>%
         legend.title = element_blank())+
 scale_color_manual(values = c("RW" = wes_cols[4], "LS ICU" = wes_cols[5], "LS Cases+ICU" = wes_cols[6]))
 log_plot
-ggsave(paste0("../plots/log_score.png"), log_plot, width = 6,
-       height = 4)
+ggsave(paste0("../plots/log_score.png"), log_plot, width = 4,
+       height = 3)
 
 
 
 
 
-crps_plot <-err_df %>% filter(date != "2021-02-02", date < "2021-06-22") %>% 
+crps_plot <-res_df %>% filter(date != "2021-02-02", date < "2021-06-22") %>% 
   ggplot(aes(x = as.Date(date))) +
   geom_line(aes(y = crps_a, color = "RW"), linetype = 2) +
   geom_line(aes(y = crps_b, color = "LS ICU"), linetype = 1) +
@@ -177,13 +146,13 @@ crps_plot <-err_df %>% filter(date != "2021-02-02", date < "2021-06-22") %>%
 ggsave(paste0("../plots/crps.png"), crps_plot, width = 6,
        height = 4)
 crps_plot
-log_score <- err_df %>%  
+log_score <- res_df %>%  
   summarize(mean_a = mean(log_a), mean_b = mean(log_b), mean_c = mean(log_c), #mean_d = mean(log_d)
   )
 
 log_score
 
-crps_score <- err_df %>%  filter(date != "2021-02-02", date < "2021-06-22") %>% 
+crps_score <- res_df %>%  filter(date != "2021-02-02", date < "2021-06-22") %>% 
   summarize(mean_a = mean(crps_a), mean_b = mean(crps_b), mean_c = mean(crps_c)#, mean_d = mean(crps_d)
   )
 
@@ -191,7 +160,7 @@ crps_score
 ## Res over time
 
 
-rep_plot <-  err_df %>% filter(date != "2021-02-02", date < "2021-06-22") %>%  
+rep_plot <-  res_df %>% filter(date != "2021-02-02", date < "2021-06-22") %>%  
     ggplot(aes(x = date)) +
     geom_line(aes(y = med_a, color = "RW")) +
     geom_line(aes(y = med_b, color = "LS ICU")) +
@@ -211,7 +180,7 @@ ggsave(paste0("../plots/res_baseline_icu.png"), rep_plot, width = 7,
        height = 4)
 
 
-rep_plot2 <-  err_df %>% filter(date != "2021-02-02", date < "2021-06-22") %>%  
+rep_plot2 <-  res_df %>% filter(date != "2021-02-02", date < "2021-06-22") %>%  
   ggplot(aes(x = date)) +
   geom_line(aes(y = med_b, color = "LS ICU")) +
   geom_line(aes(y = med_c, color = "LS Cases+ICU")) +
@@ -329,6 +298,162 @@ snap_res_lead_signal <- dat_mod %>% group_by(date=death_date) %>%
 
 ggsave(paste0("../plots/snap_res_leadsignal.png"), snap_res_lead_signal, width = 4,
        height = 3)
+
+
+
+relative_error_rep_plot <-  res_df  %>%
+  na.omit() %>% 
+  ggplot(aes(x = date)) +
+  geom_line(aes(y = rel_a, color = "Random walk")) +
+  geom_line(aes(y = rel_b, color = "Lead signal (ICU)")) +
+  geom_line(aes(y = rel_c, color = "Lead signal (ICU+cases)")) +
+  # geom_line(aes(y = rel_d, color = "RW + Lead signal (ICU)")) +
+  geom_line(aes(y = 1, color = "True number"), lty = 2) +
+  ylab("Relative error") +
+  xlab("Date") +
+  scale_x_date(date_breaks = "1 week", date_labels = "%b %d") +
+  theme(legend.background = element_blank(),
+        legend.position = c(0.8, 0.97),
+        legend.justification = c("right", "top"),
+        legend.title = element_blank())  #+
+#scale_color_manual(values = colors)
+
+ggsave(paste0("../plots/rel_plot.png"), relative_error_rep_plot, width = 6,
+       height = 4)
+
+
+
+
+rmse_plot <- res_df %>% filter(date < "2021-06-22") %>% 
+  ggplot(aes(x = date)) +
+  geom_line(aes(y = err_a, color = "Random walk")) +
+  geom_line(aes(y = err_b, color = "Lead signal (ICU)"), linetype = 2) +
+  geom_line(aes(y = err_c, color = "Lead signal (ICU+cases) cp"), linetype = 4) +
+  #   geom_line(aes(y = err_d, color = "RW + Lead signal (ICU)"), linetype = 3) +
+  ylab("RMSE") +
+  xlab("Date") +
+  scale_x_date(date_breaks = "1 month", date_labels = "%y-%m-%d") +
+  theme(legend.background = element_blank(),
+        legend.position = c(0.9, 0.97),
+        legend.justification = c("right", "top"),
+        legend.title = element_blank()) #+
+#scale_color_manual(values = c("Random Walk" = wes_cols[4], "Lead signal (ICU)" = wes_cols[2], 
+#  "RW + Lead signal (ICU)" = wes_cols[5]))
+
+ggsave(paste0("../plots/rmse.png"), rmse_plot, width = 6,
+       height = 4)
+
+
+
+log_plot <-res_df %>%filter(crps_b < 1000, date < "2021-06-22") %>% 
+  ggplot(aes(x = as.Date(date))) +
+  geom_line(aes(y = log_a, color = "RW")) +
+  geom_line(aes(y = log_b, color = "Lead signal (ICU)"), linetype = 2) +
+  geom_line(aes(y = log_c, color = "Lead signal (ICU + cases)"),linetype = 3) +
+  ylab("Log Score") +
+  xlab("Date") +
+  scale_x_date(date_breaks = "1 month", date_labels = "%y-%m-%d") +
+  theme(legend.background = element_blank(),
+        legend.position = c(0.9, 0.97),
+        legend.justification = c("right", "top"),
+        legend.title = element_blank())#+
+#  scale_color_manual(values = c("Baseline" = wes_cols[4], 
+#       "Including ICU" = wes_cols[5]))
+
+ggsave(paste0("../plots/log_score.png"), log_plot, width = 6,
+       height = 4)
+
+
+crps_plot <-res_df %>%filter(crps_b < 1000, date < "2021-06-22") %>% 
+  ggplot(aes(x = as.Date(date))) +
+  geom_line(aes(y = crps_a, color = "RW")) +
+  geom_line(aes(y = crps_b, color = "Lead signal (ICU)"), linetype = 2) +
+  geom_line(aes(y = crps_c, color = "Lead signal (ICU + cases)"),linetype = 3) +
+  #geom_line(aes(y = crps_d, color = "RW + lead signal"),linetype = 3) +
+  ylab("CRPS") +
+  xlab("Date") +
+  scale_x_date(date_breaks = "1 month", date_labels = "%y-%m-%d") +
+  theme(legend.background = element_blank(),
+        legend.position = c(0.9, 0.97),
+        legend.justification = c("right", "top"),
+        legend.title = element_blank())#+
+#  scale_color_manual(values = c("Baseline" = wes_cols[4], 
+#       "Including ICU" = wes_cols[5]))
+ggsave(paste0("../plots/crps.png"), crps_plot, width = 6,
+       height = 4)
+
+rmse_score <- res_df %>% filter(crps_b < 1000, date < "2021-06-22") %>% na.omit()%>% 
+  summarize(mean_a = mean(err_a), mean_b = mean(err_b), mean_c = mean(err_c))
+rmse_score
+
+log_score <- res_df %>%filter(crps_b < 1000, date < "2021-06-22")  %>% 
+  summarize(mean_a = mean(log_a), mean_b = mean(log_b), mean_c = mean(log_c), #mean_d = mean(log_d)
+  )
+
+log_score
+
+crps_score <- res_df  %>% filter(crps_b < 1000, date < "2021-06-22") %>% 
+  summarize(mean_a = mean(crps_a), mean_b = mean(crps_b), mean_c = mean(crps_c))
+crps_score
+
+#### PI
+pi_a_95 <- c()
+n_e <- 145 # nrow(res_df)
+for(i in 1:n_e){
+  #if(i != 73){
+  v1 <- N_mod_a[[i]][,56] %>% unlist()
+  n <- retro_truth %>% filter(date == rep_dates[i]) %>% select(n_true_retro) %>% unlist()
+  pi_a_95[i] <-between(n, quantile(v1, .025), quantile(v1, .975))
+  #}
+}
+sum(na.omit(pi_a_95))/145
+
+pi_a_90 <- c()
+i <- 64
+for(i in 1:nrow(res_df)){
+  v1 <- N_mod_a[[i]][,56] %>% unlist()
+  n <- retro_truth %>% filter(date == rep_dates[i]) %>% select(n_true_retro) %>% unlist()
+  pi_a_90[i] <-between(n, quantile(v1, .05), quantile(v1, .95))}
+
+sum(na.omit(pi_a_90))/145
+
+pi_b_95 <- c()
+for(i in 1:145){
+  
+  v1 <- N_mod_b[[i]][,56] %>% unlist()
+  n <- retro_truth %>% filter(date == rep_dates[i]) %>% select(n_true_retro) %>% unlist()
+  try(pi_b_95[i] <-between(n, quantile(v1, .025), quantile(v1, .975)))
+}
+sum(na.omit(pi_b_95))/145
+
+
+pi_b_90 <- c()
+for(i in 1:145){
+  v1 <- N_mod_b[[i]][,56] %>% unlist()
+  n <- retro_truth %>% filter(date == rep_dates[i]) %>% select(n_true_retro) %>% unlist()
+  pi_b_90[i] <-between(n, quantile(v1, .05), quantile(v1, .95))
+}
+(sum(na.omit(pi_b_90)))/145
+
+
+pi_c_95 <- c()
+for(i in 1:145){
+  
+  v1 <- N_mod_c[[i]][,56] %>% unlist()
+  n <- retro_truth %>% filter(date == rep_dates[i]) %>% select(n_true_retro) %>% unlist()
+  try(pi_c_95[i] <-between(n, quantile(v1, .025), quantile(v1, .975)))
+}
+sum(na.omit(pi_c_95))/145
+
+
+pi_c_90 <- c()
+for(i in 1:145){
+  v1 <- N_mod_c[[i]][,56] %>% unlist()
+  n <- retro_truth %>% filter(date == rep_dates[i]) %>% select(n_true_retro) %>% unlist()
+  pi_c_90[i] <-between(n, quantile(v1, .05), quantile(v1, .95))
+}
+(sum(na.omit(pi_c_90)))/145
+
 
 
 

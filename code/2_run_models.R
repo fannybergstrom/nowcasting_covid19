@@ -36,16 +36,14 @@ evaluate_nowcast <- function(model, now) {
     select(date = Datum_vårdstart, n_icu = Antal_intensivvårdade) %>%
     left_join(FHM_cases %>% select(date = Statistikdatum, n_cases = Totalt_antal_fall)) %>%
     mutate(
-      mean_7_c = rollmean(n_cases, k = 7, fill = NA, align = "right"),
-      mean_7_c_lag = lag(mean_7_c, k = 7, fill = NA),
-      lead_ind_cases = log(lag(mean_7_c, k = 19, fill = NA)),
-      mean_7_i = rollmean(n_icu, k = 7, fill = NA, align = "right"),
-      lead_ind_icu = log(lag(mean_7_i, k = 10, fill = NA)),
-      mean_7_i_lag = lag(mean_7_i, k = 10, fill = NA),
-      diff_mean7_i = as.numeric(diff(as.zoo(mean_7_i), lag = 7, na.pad = T)),
+      mean_7_c = rollmean(n_cases, k = 7, fill = NA, align = "center"),
+      mean_7_c_lag = lag(mean_7_c, 7, fill = NA),
+      lead_ind_cases = log(lag(mean_7_c, 19, fill = NA)),
+      mean_7_i = rollmean(n_icu, 7, fill = NA, align = "center"),
+      lead_ind_icu = log(lag(mean_7_i, 14, fill = NA)),
+      mean_7_i_lag = lag(mean_7_i, 10, fill = NA),
       ratio_i = lag(log(lag(mean_7_i / mean_7_i_lag, 7)), k = 4),
-      ratio_c = log(lag(mean_7_c / mean_7_c_lag, 7))
-    ) %>%
+      ratio_c = log(lag(mean_7_c / mean_7_c_lag, 7))) %>%
     filter(
       date <= now,
       date >= start - 1
@@ -360,10 +358,32 @@ evaluate_nowcast <- function(model, now) {
       max_treedepth = 15
     )
     warn <- names(warnings()) 
-    save_res <- c("N", "p", "beta_0", "beta_1", "logLambda")
+    save_res <- c("N", "p", "beta_0", "beta_1","logLambda")
   }
   
-
+  if(model == "mod_e"){
+    samples <- mod$sample(
+      data = list(
+        T = prep_dat_list$cap_T,
+        D = prep_dat_list$maxDelay,
+        r = prep_dat_list$rT,
+        lead_ind_1 = ts$ratio_i,
+        lead_ind_2 = ts$ratio_c,
+        k_wd_haz = dim(aperm(prep_dat_list$W_wd_cp, c(2, 1, 3)))[3],
+        W_wd = aperm(prep_dat_list$W_wd_cp, c(2, 1, 3)),
+        Z = prep_dat_list$Z,
+        alpha = rep(1, prep_dat_list$maxDelay + 1)
+      ),
+      seed = 1142,
+      chains = 4,
+      parallel_chains = 4,
+      adapt_delta = 0.95,
+      max_treedepth = 15
+    )
+    warn <- names(warnings()) 
+    save_res <- c("N", "p", "beta_0", "beta_1", "beta_2", "logLambda")
+  }
+  
   # Save warnings and results
   samples$cmdstan_diagnose() %>% 
     as.data.frame() %>%
@@ -393,8 +413,8 @@ rep_dates <- dat %>%
   t() %>%
   as.vector()
 
-for(i in 31:40){
+for(i in 49:80){
 date <- rep_dates[i]
-model_spec <- "mod_b_cases"
+model_spec <- "mod_e"
 lapply(model_spec , evaluate_nowcast, date)
 }

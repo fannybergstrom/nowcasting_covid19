@@ -12,6 +12,7 @@ setwd("~/Documents/GitHub/nowcasting_covid19/code")
 # Import data
 dat <- read_csv("../data/covid_deaths.csv")
 
+now = "2021-02-02"
 evaluate_nowcast <- function(model, now) {
 
   FHM_ICU <- read_excel(paste0("../data/FoHM/Folkhalsomyndigheten_Covid19_", now, ".xlsx"),
@@ -40,9 +41,10 @@ evaluate_nowcast <- function(model, now) {
       mean_7_c_lag = lag(mean_7_c, 7, fill = NA),
       lead_ind_cases = log(lag(mean_7_c, 19, fill = NA)),
       mean_7_i = rollmean(n_icu, 7, fill = NA, align = "center"),
+      mean_7_i_lag = lag(mean_7_i, 7, fill = NA),
       lead_ind_icu = log(lag(mean_7_i, 14, fill = NA)),
-      mean_7_i_lag = lag(mean_7_i, 10, fill = NA),
-      ratio_i = lag(log(lag(mean_7_i / mean_7_i_lag, 7)), k = 4),
+      lead_ind_icu_f = lag(mean_7_i-mean_7_i_lag, 10, fill = NA),
+      ratio_i = lag(mean_7_i / mean_7_i_lag, 7),
       ratio_c = log(lag(mean_7_c / mean_7_c_lag, 7))) %>%
     filter(
       date <= now,
@@ -139,7 +141,11 @@ evaluate_nowcast <- function(model, now) {
     
     W_wd_cp <- abind(W_wd, W_cp, along = 3)
 
-    # Create Z matrix indicating non-reporting weekdays ("Mon", "Sat", "Sun" are one, else zero)
+    # Create Z matrix indicating non-reporting weekdays and public holidays ("Mon", "Sat", "Sun" and holidays are one, else zero)
+    holidays_list <- c("2020-10-31", "2020-12-24", "2020-12-25", "2020-12-26", 
+                       "2021-01-01", "2021-01-06","2021-04-02", "2021-04-04", 
+                       "2021-05-01", "2021-05-13","2021-05-23","2021-06-06","2021-06-26")
+    
     Z <- array(NA,
       dim = c(length(t02s), D + 1),
       dimnames = list(as.character(t02s), paste("delay", 0:D, sep = ""))
@@ -148,7 +154,10 @@ evaluate_nowcast <- function(model, now) {
     # Loop over all times and lags
     for (t in seq_len(length(t02s))) {
       for (d in 0:D) {
-        Z[t, d + 1] <- as.numeric(lubridate::wday(t02s[t] + d, label = F) %in% c(2, 7, 1))
+        Z[t, d + 1] <- as.numeric(lubridate::wday(t02s[t] + d, label = F) %in% c(2, 7, 1)) 
+        if(as.character(t02s[t] + d) %in% holidays_list){
+          Z[t, d + 1] <- 1
+        }
       }
     }
 
@@ -195,7 +204,7 @@ evaluate_nowcast <- function(model, now) {
     save_res <- c("N", "p", "logLambda")
   }
   
-  if(model == "mod_a_cp"){
+  if(model %in% c("mod_a_cp", "mod_a_ph")){
     samples <- mod$sample(
       data = list(
         T = prep_dat_list$cap_T,
@@ -235,7 +244,7 @@ evaluate_nowcast <- function(model, now) {
   save_res <- c("N", "p", "beta_0", "beta_1", "logLambda")
   }
   
-  if(model == "mod_b_cp"){
+  if(model %in% c("mod_b_cp", "mod_b_ph")){
     samples <- mod$sample(
       data = list(
         T = prep_dat_list$cap_T,
@@ -249,7 +258,7 @@ evaluate_nowcast <- function(model, now) {
       ),
       seed = 1142,
       chains = 4,
-      adapt_delta = 0.95,
+      adapt_delta = 0.98,
       parallel_chains = 4
     )
     save_res <- c("N", "p", "beta_0", "beta_1", "logLambda")
@@ -332,14 +341,14 @@ evaluate_nowcast <- function(model, now) {
       seed = 1142,
       chains = 4,
       parallel_chains = 4,
-      adapt_delta = 0.95,
+      adapt_delta = 0.98,
       max_treedepth = 15
     )
     warn <- names(warnings()) 
     save_res <- c("N", "p", "beta_0", "beta_1", "logLambda")
   }
   
-  if(model == "mod_d_cp"){
+  if(model %in% c("mod_d_new, mod_d_ph")){
     samples <- mod$sample(
       data = list(
         T = prep_dat_list$cap_T,
@@ -354,7 +363,7 @@ evaluate_nowcast <- function(model, now) {
       seed = 1142,
       chains = 4,
       parallel_chains = 4,
-      adapt_delta = 0.95,
+      adapt_delta = 0.98,
       max_treedepth = 15
     )
     warn <- names(warnings()) 
@@ -384,6 +393,28 @@ evaluate_nowcast <- function(model, now) {
     save_res <- c("N", "p", "beta_0", "beta_1", "beta_2", "logLambda")
   }
   
+  
+  if(model %in% c("mod_f", "mod_f_ph")){
+    samples <- mod$sample(
+      data = list(
+        T = prep_dat_list$cap_T,
+        D = prep_dat_list$maxDelay,
+        r = prep_dat_list$rT,
+        lead_ind = ts$lead_ind_icu_f,
+        k_wd_haz = dim(aperm(prep_dat_list$W_wd_cp, c(2, 1, 3)))[3],
+        W_wd = aperm(prep_dat_list$W_wd_cp, c(2, 1, 3)),
+        Z = prep_dat_list$Z,
+        alpha = rep(1, prep_dat_list$maxDelay + 1)
+      ),
+      seed = 1142,
+      chains = 4,
+      parallel_chains = 4,
+      adapt_delta = 0.99,
+      max_treedepth = 15
+    )
+    warn <- names(warnings()) 
+    save_res <- c("N", "p", "beta_1", "logLambda")
+  }
   # Save warnings and results
   samples$cmdstan_diagnose() %>% 
     as.data.frame() %>%
@@ -413,8 +444,10 @@ rep_dates <- dat %>%
   t() %>%
   as.vector()
 
-for(i in 49:80){
+
+for(i in 69:140){
 date <- rep_dates[i]
-model_spec <- "mod_e"
+model_spec <- "mod_b_ph"
 lapply(model_spec , evaluate_nowcast, date)
 }
+

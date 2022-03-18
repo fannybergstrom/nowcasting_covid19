@@ -1,6 +1,6 @@
 // Model description:
 // Perform Bayesian hierarchical Nowcast with log-linear model for 
-// log(lambda_{t}) = N(beta_0*log(lambda_{t-1}) + beta_1*lead_ind_{t-1}), sigma), 
+// log(lambda_{t}) = N(beta_0 * log(lambda_{t-1}) + beta_1 * lead_ind_{t}), sigma), 
 // model observed case counts n_{t,d} ~ NB(lambda[t]*p_{t,d}, phi), 
 // with phi over-dispersion
 // Delay distribution: Discrete time-hazard model with week-day effects
@@ -63,7 +63,7 @@ model {
   // Priors
   sigma ~ normal(0, .5); // scale of the error-term
   // Random walk
-  logLambda[1] ~ normal(0, 3) + beta_1 * lead_ind[1];
+  logLambda[1] ~ normal(0 + beta_1 * lead_ind[1], 3);
   for(t in 2:T) {
     logLambda[t] ~ normal(beta_0 * logLambda[t-1] + beta_1 * lead_ind[t], sigma);
   }

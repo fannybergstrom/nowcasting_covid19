@@ -12,7 +12,6 @@ setwd("~/Documents/GitHub/nowcasting_covid19/code")
 # Import data
 dat <- read_csv("../data/covid_deaths.csv")
 
-now = "2021-02-02"
 evaluate_nowcast <- function(model, now) {
 
   FHM_ICU <- read_excel(paste0("../data/FoHM/Folkhalsomyndigheten_Covid19_", now, ".xlsx"),
@@ -141,10 +140,12 @@ evaluate_nowcast <- function(model, now) {
     
     W_wd_cp <- abind(W_wd, W_cp, along = 3)
 
-    # Create Z matrix indicating non-reporting weekdays and public holidays ("Mon", "Sat", "Sun" and holidays are one, else zero)
+    # Create Z matrix indicating non-reporting weekdays and public holidays 
+    #("Mon", "Sat", "Sun" and holidays are one, else zero)
     holidays_list <- c("2020-10-31", "2020-12-24", "2020-12-25", "2020-12-26", 
-                       "2021-01-01", "2021-01-06","2021-04-02", "2021-04-04", 
-                       "2021-05-01", "2021-05-13","2021-05-23","2021-06-06","2021-06-26")
+                       "2020-12-31", "2021-01-01", "2021-01-06","2021-04-02", 
+                       "2021-04-04", "2021-05-01", "2021-05-13","2021-05-23",
+                       "2021-06-06","2021-06-26")
     
     Z <- array(NA,
       dim = c(length(t02s), D + 1),
@@ -181,7 +182,7 @@ evaluate_nowcast <- function(model, now) {
     begin_date = start,
     D = D_max # maximum delay
   )
-  
+
   stan_mod <- substr(model, 1, 5)
   mod <- cmdstanr::cmdstan_model(paste0("./stan_models/", stan_mod, ".stan"))
   
@@ -348,13 +349,13 @@ evaluate_nowcast <- function(model, now) {
     save_res <- c("N", "p", "beta_0", "beta_1", "logLambda")
   }
   
-  if(model %in% c("mod_d_new, mod_d_ph")){
+  if(model %in% c("mod_d_new", "mod_d_ph")){
     samples <- mod$sample(
       data = list(
         T = prep_dat_list$cap_T,
         D = prep_dat_list$maxDelay,
         r = prep_dat_list$rT,
-        lead_ind = ts$ratio_i,
+        lead_ind = ts$lead_ind_icu_f,
         k_wd_haz = dim(aperm(prep_dat_list$W_wd_cp, c(2, 1, 3)))[3],
         W_wd = aperm(prep_dat_list$W_wd_cp, c(2, 1, 3)),
         Z = prep_dat_list$Z,
@@ -404,12 +405,11 @@ evaluate_nowcast <- function(model, now) {
         k_wd_haz = dim(aperm(prep_dat_list$W_wd_cp, c(2, 1, 3)))[3],
         W_wd = aperm(prep_dat_list$W_wd_cp, c(2, 1, 3)),
         Z = prep_dat_list$Z,
-        alpha = rep(1, prep_dat_list$maxDelay + 1)
-      ),
+        alpha = rep(1, prep_dat_list$maxDelay + 1)),
       seed = 1142,
       chains = 4,
       parallel_chains = 4,
-      adapt_delta = 0.99,
+      adapt_delta = 0.97,
       max_treedepth = 15
     )
     warn <- names(warnings()) 
@@ -445,9 +445,9 @@ rep_dates <- dat %>%
   as.vector()
 
 
-for(i in 69:140){
-date <- rep_dates[i]
-model_spec <- "mod_b_ph"
+#for(i in 101:120){
+date <- "2020-11-17" #rep_dates[i]
+model_spec <- "mod_f_ph"
 lapply(model_spec , evaluate_nowcast, date)
-}
+#}
 

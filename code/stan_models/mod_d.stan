@@ -61,6 +61,8 @@ transformed parameters {
 
 model {
   // Priors
+  beta_0 ~ normal(1, .5);
+  beta_1 ~ normal(0, .5);
   sigma ~ normal(0, .5); // scale of the error-term
   // Random walk
   logLambda[1] ~ normal(0 + beta_1 * lead_ind[1], 3);

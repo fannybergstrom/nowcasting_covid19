@@ -63,7 +63,7 @@ model {
   sigma ~ normal(0, .5); // scale of the error-term
   beta_1 ~  normal(0, .1);
   // Random walk
-  logLambda[1] ~ normal(log(fmax(sum(r[1,]),1)), .1);
+  logLambda[1] ~ normal(log(fmax(sum(r[1,])+ beta_1 * lead_ind[1],1)), .1);
   for(t in 2:T) {
     logLambda[t] ~ normal(log(fmax(exp(logLambda[t-1]) + beta_1 * lead_ind[t-1],1)), sigma);
   }

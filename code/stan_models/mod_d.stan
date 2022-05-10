@@ -23,7 +23,7 @@ parameters {
   vector[T] logLambda; // expected number of cases at time t in strata s
   // epi-curve model
   real<lower=0, upper=2> sigma; // Variance parameter for random walk
-  real beta_0; // Intercept
+  //real beta_0; // Intercept
   real beta_1; // Association coefficient
   // reporting model
   // week-day effect
@@ -43,10 +43,10 @@ transformed parameters {
   // data model
   real phi;
   // Discrete hazard model
-  gamma = logit((p_bl_pr ./ cumulative_sum(p_bl_pr[(D + 1):1])[(D + 1):1])[1:(D)]);
+  gamma = logit((p_bl_pr ./ reverse(cumulative_sum(reverse(p_bl_pr))))[1:D]);
   
   for (d in 1:(D)){
-    h[, d] = inv_logit(gamma[d] + W_wd[d]*beta_wd_haz) .* (rep_vector(1, T) - Z[, d]);
+    h[, d] = inv_logit(gamma[d] + W_wd[d] * beta_wd_haz) .* (rep_vector(1, T) - Z[, d]);
     if (d==1) {
         p[, d] = h[, d];
       } else {      
@@ -61,13 +61,13 @@ transformed parameters {
 
 model {
   // Priors
-  beta_0 ~ normal(1, .5);
+ // beta_0 ~ normal(1, .5);
   beta_1 ~ normal(0, .5);
-  sigma ~ normal(0, .5); // scale of the error-term
+  sigma ~ normal(1, .5); // scale of the error-term
   // Random walk
   logLambda[1] ~ normal(0 + beta_1 * lead_ind[1], 3);
   for(t in 2:T) {
-    logLambda[t] ~ normal(beta_0 * logLambda[t-1] + beta_1 * lead_ind[t], sigma);
+    logLambda[t] ~ normal( logLambda[t-1] + beta_1 * lead_ind[t], sigma^2 * epsilon[t]^2);
   }
   // Reporting delay
   // Hyper-prior
@@ -75,7 +75,7 @@ model {
   sd_beta_wd_haz ~ normal(0, 0.5);
   // Prior
   beta_wd_haz ~ normal(0, sd_beta_wd_haz);
-
+  reciprocal_phi ~uniform(0,1);
   // log-Lambda
   epsilon ~ std_normal();
   // Model for observed counts

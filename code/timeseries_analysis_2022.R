@@ -5,7 +5,7 @@ library(zoo)
 library(readxl)
 library(wesanderson)
 select <- dplyr::select
-
+setwd("/media/fabe4028/suhome/Documents/Forskning/Nowcasting/nowcasting_covid19/code")
 # Data from nowcasting
 #nc_res <- read_csv("../data/nc_res.csv")  
 # FHM
@@ -19,77 +19,81 @@ FHM_deaths <- read_excel("../data/FHM/FHM_latest.xlsx",
 FHM_cases <- read_excel("../data/FHM/FHM_latest.xlsx", 
                         sheet = "Antal per dag region")
 
-SOC_hosp <- read_csv("../data/Socialstyrelsen/soc_22v06.csv")
 
 #remove final row
 FHM_deaths <- FHM_deaths[-nrow(FHM_deaths),]
 
 # Save dates 
-now <- ymd("2021-12-31")
+now <- ymd("2020-12-31")
 start <- now - 180
 
 #start <- ymd("2020-10-15")
 #now <- start+120
 
 # Create time series data frame
-ts <- FHM_deaths %>% select(date = Datum_avliden, n_deaths = Antal_avlidna)  %>%
-  left_join(FHM_ICU %>% select(date = Datum_vårdstart, n_icu = Antal_intensivvårdade)) %>% 
-  left_join(FHM_cases %>% select(date = Statistikdatum, n_cases = Totalt_antal_fall)) %>% 
-                  mutate(n_deaths_lag1 = lag(n_deaths, 1),
-                    avg_7_c = rollmean(n_cases, k = 7, fill = NA, align = 'right'),
-                    avg_7_c_lag = rollmean(avg_7_c, k = 7, fill = NA),
-                    avg_7_i = rollmean(n_icu, k = 7, fill = NA, align = 'right'),
-                    avg_7_i_lag = lag(avg_7_i, k = 7, fill = NA),
-                    diff_7_i = as.numeric(diff(as.zoo(avg_7_i), lag= 7, na.pad=T)),
-                    ratio_i = log(lag(avg_7_i/avg_7_i_lag, 1)),
-                    ratio_c = log(lag(avg_7_c/avg_7_c_lag, 7)),
-                    diff_c = avg_7_c-avg_7_c_lag)
+ts <- FHM_ICU %>%
+  select(date = Datum_vårdstart, n_icu = Antal_intensivvårdade) %>%
+  left_join(FHM_cases %>% select(date = Statistikdatum, n_cases = Totalt_antal_fall)) %>%
+  left_join(FHM_deaths %>% select(date = Datum_avliden, n_deaths = Antal_avlidna)) %>% 
+  mutate(
+    n_deaths_lag = lag(n_deaths, 1, fill = NA),
+    mean_7_c = rollmean(n_cases, k = 7, fill = NA, align = "center"),
+    mean_7_c_lag = lag(mean_7_c, 7, fill = NA),
+    lead_ind_cases = log(lag(mean_7_c, 19, fill = NA)),
+    mean_7_i = rollmean(n_icu, 7, fill = NA, align = "center"),
+    mean_7_i_lag = lag(mean_7_i, 7, fill = NA),
+    lead_ind_icu = log(lag(mean_7_i, 14, fill = NA)),
+    lead_ind_icu_f = lag(mean_7_i-mean_7_i_lag, 1, fill = NA),
+    lead_ind_icu_d = lag(log(mean_7_i)-log(mean_7_i_lag), 3, fill = NA),
+    ratio_i = lag(mean_7_i / mean_7_i_lag, 7),
+    ratio_c = log(lag(mean_7_c / mean_7_c_lag, 7)))
 
-res1 <- lm(log(n_deaths+1) ~ -1 + log(n_deaths_lag1+1), 
-           data = ts %>% filter(date > "2020-04-01", date < "2021-03-01")) %>% summary() 
-res1$adj.r.squared
-res2 <- lm(log(n_deaths+1) ~ -1 + log(n_deaths_lag1+1) + ratio_c, 
-           data = ts %>% filter(date > "2020-04-01", date < "2021-03-01")) %>% summary()
-res2$adj.r.squared
-res2 <- lm(log(n_deaths+1) ~ -1 + log(n_deaths_lag1+1) + ratio_h, 
-           data = ts %>% filter(date > "2020-04-01", date < "2021-03-01")) %>% summary()
-res2$adj.r.squared
-res3 <- lm(log(n_deaths+1) ~ -1 + log(n_deaths_lag1+1) + ratio_i, 
+
+res3 <- lm(log(n_deaths+1) ~ -1 + log(n_deaths_lag+1), 
+           data = ts %>% filter(date > "2020-09-01", date < "2020-12-15")) %>% summary()
+res3$adj.r.squared
+
+
+res3 <- lm(log(n_deaths+1) ~ -1 + log(n_deaths_lag+1) + lead_ind_icu_f, 
+           data = ts %>% filter(date > "2020-09-01", date < "2020-12-15")) %>% summary()
+res3$adj.r.squared
+
+res3 <- lm(log(n_deaths+1) ~ -1 + log(n_deaths_lag+1) + lead_ind_icu_d, 
+           data = ts %>% filter(date > "2020-09-01", date < "2020-12-15")) %>% summary()
+res3$adj.r.squared
+
+res3 <- lm(log(n_deaths) ~ -1 + log(n_deaths_lag), 
            data = ts %>% filter(date > "2020-04-01", date < "2021-03-01")) %>% summary()
 res3$adj.r.squared
+
+
 res4 <- lm(log(n_deaths+1) ~ -1 + log(n_deaths_lag1+1) + ratio_c +ratio_i, 
            data = ts %>% filter(date > "2020-04-01", date < "2021-03-01")) %>% summary()
 res4$adj.r.squared
+
+
 
 lm(n_deaths ~ -1 + ratio_c, data = ts, offset = n_deaths_lag1) %>% summary()
 
 res <- c()
 for(i in 1:40){
-  ts_i <- ts %>% select(date, n_deaths, n_deaths_lag1 , ratio_c) %>% 
-  mutate(ratio_c = lag(ratio_c, i)) %>%
-    filter(date > "2020-04-01", date < "2021-03-01")
- res[i]<- summary(lm(log(n_deaths+1) ~ -1 + log(n_deaths_lag1+1) + ratio_c, data = ts_i))$r.squared
+  ts_i <- ts %>% select(date, n_deaths, n_deaths_lag , lead_ind_icu_d) %>% 
+  mutate(ratio_c = lag(lead_ind_icu_d, i)) %>%
+    filter(date > "2020-09-01", date < "2020-12-15")
+ res[i]<- summary(lm(log(n_deaths+1) ~ -1 + log(n_deaths_lag+1) + ratio_c, data = ts_i))$adj.r.squared
 } 
 which.max(res)
-
+resf <- res
 res <- c()
 for(i in 1:30){
   ts_i <- ts %>% select(date, n_deaths, n_deaths_lag1 , ratio_i) %>% 
     mutate(ratio_i = lag(ratio_i, i)) %>%
     filter(date > "2020-04-01", date < "2021-03-01")
-  res[i]<- summary(lm(log(n_deaths+1) ~ -1 + log(n_deaths_lag1+1) + ratio_i, data = ts_i))$r.squared
+  res[i]<- summary(lm(log(n_deaths+1) ~ -1 + log(n_deaths_lag1+1) + ratio_i, data = ts_i))$adj.r.squared
 } 
 which.max(res)
 
 res <- c()
-for(i in 1:30){
-  ts_i <- ts %>% select(date, n_deaths, n_deaths_lag1 , avg_7_i_lag) %>% 
-    mutate(avg_7_i = lag(avg_7_i_lag, i)) %>%
-    filter(date > "2020-04-01", date < "2021-03-01")
-  res[i]<- summary(lm(log(n_deaths+1) ~ -1 + avg_7_i, data = ts_i))$r.squared
-} 
-which.max(res)
-
 for(i in 1:30){
   ts_i <- ts %>% select(date, n_deaths, n_deaths_lag1 , avg_7_i_lag) %>% 
     mutate(avg_7_i = lag(avg_7_i_lag, i)) %>%
@@ -103,6 +107,22 @@ for(i in 1:30){
     mutate(avg_7_i = lag(avg_7_i, i)) %>%
     filter(date > "2020-04-01", date < "2021-03-01")
   res[i]<- summary(lm(log(n_deaths+1) ~ log(avg_7_i), data = ts_i))$r.squared
+} 
+which.max(res)
+
+for(i in 1:30){
+  ts_i <- ts %>% select(date, n_deaths, n_deaths_lag1 , avg_7_i) %>% 
+    mutate(avg_7_i = lag(avg_7_i, i)) %>%
+    filter(date > "2020-04-01", date < "2021-03-01")
+  res[i]<- summary(lm(log(n_deaths+1) ~ log(avg_7_i), data = ts_i))$r.squared
+} 
+which.max(res)
+
+for(i in 1:30){
+  ts_i <- ts %>% select(date, n_deaths , avg_7_c) %>% 
+    mutate(avg_7_c = lag(avg_7_c, i)) %>%
+    filter(date > "2020-04-01", date < "2021-03-01")
+  res[i]<- summary(lm(log(n_deaths+1) ~ log(avg_7_c), data = ts_i))$r.squared
 } 
 which.max(res)
 
@@ -180,11 +200,6 @@ ts  %>%
   #geom_line(aes(y=sum_7_h, col = "Hospitalisations"))+
   geom_line(aes(y=sum_7_i, col = "ICU"))+
   geom_line(aes(y=sum_7_d,col = "Deaths"))
-
-
-
-  
-
 
 icu_ts <- FHM_ICU %>% mutate(sum_7 = rollsum(Antal_intensivvårdade, k = 7, fill = NA, align = 'right'),
                             diff_sum7 = as.numeric(diff(as.zoo(sum_7), lag= 7, na.pad=T)),

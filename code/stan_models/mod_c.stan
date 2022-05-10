@@ -1,12 +1,6 @@
 // Model description:
 // Perform Bayesian hierarchical Nowcast with log-linear model for 
-// log(lambda_{t}) = N(beta_0 + beta_1*lead_ind_1_t + beta_2*lead_ind_2_t, sigma), 
-// Model observed case counts n_{t,d} ~ NB(lambda[t]*p_{t,d}, phi), 
-// with phi over-dispersion
-// Delay distribution: Discrete time-hazard model with week-day effects
-// Model description:
-// Perform Bayesian hierarchical Nowcast with log-linear model for 
-// log(lambda_{t}) = N(beta_0 + beta_1*lead_ind_1 + beta_2*lead_ind_2, sigma), 
+// log(lambda_{t}) = N(beta_0 + beta_1*lead_ind_t, sigma), 
 // model observed case counts n_{t,d} ~ NB(lambda[t]*p_{t,d}, phi), 
 // with phi over-dispersion
 // delay distribution: Discrete time-hazard model with week-day effects
@@ -17,8 +11,8 @@ data {
   int D;              // Maximum delay and number of columns of reporting triangle'
   int r[T, D + 1];    // Reporting triangle (Including zero delay)
   int k_wd_haz;       // Number covariates discrete-time hazard model
-  real lead_ind_1[T]; // Lead indicator 1
-  real lead_ind_2[T]; // Lead indicator 2
+  real lead_ind_1[T]; // Lead indicator
+  real lead_ind_2[T]; // Lead indicator
   matrix[T, k_wd_haz] W_wd[D + 1];  // Design matrix for discrete hazard model
   matrix[T, D + 1] Z;        // Matrix indicating non-reporting days
   // prior parameter
@@ -31,7 +25,7 @@ parameters {
   // epi-curve model
   real<lower=0, upper=2> sigma; // Variance parameter for random walk
   real beta_0; // Intercept
-  real beta_1; // Association coefficient 1
+  real beta_1; // Association coefficient
   real beta_2; // Association coefficient
   // reporting model
   // week-day effect
@@ -52,7 +46,7 @@ transformed parameters {
   // data model
   real phi;
   // Discrete hazard model
-  gamma = logit((p_bl_pr ./ cumulative_sum(p_bl_pr[(D + 1):1])[(D + 1):1])[1:(D)]);
+  gamma = logit((p_bl_pr ./ reverse(cumulative_sum(reverse(p_bl_pr))))[1:D]);
   
   for (d in 1:(D)){
     h[, d] = inv_logit(gamma[d] + W_wd[d]*beta_wd_haz) .* (rep_vector(1, T) - Z[, d]);
@@ -66,7 +60,7 @@ transformed parameters {
   p[, D + 1] = 1 - (p[, 1:D] * rep_vector(1, D));
   // log-lambda
   for(t in 1:T){
-    logLambda[t] = beta_0 + beta_1 * lead_ind_2[t] +  beta_2 * lead_ind_2[t] + sigma * epsilon[t]; // Derive logLambda from non-centered parametrization
+    logLambda[t] = beta_0 + beta_1 * lead_ind_1[t] + beta_1 * lead_ind_2[t] + sigma * epsilon[t]; // Derive logLambda from non-centered parametrization
   }
   // Overdispersion
   phi = 1 / reciprocal_phi;
@@ -86,7 +80,7 @@ model {
   beta_wd_haz ~ normal(0, sd_beta_wd_haz);
 
   // log-Lambda
-  beta_0 ~ normal(0,2);
+  beta_0 ~ normal(0,0.2);
   beta_1 ~ normal(0,0.5);
   beta_2 ~ normal(0,0.5);
   epsilon ~ std_normal();

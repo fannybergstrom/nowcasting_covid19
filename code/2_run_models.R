@@ -37,12 +37,16 @@ evaluate_nowcast <- function(model, now) {
     left_join(FHM_cases %>% select(date = Statistikdatum, n_cases = Totalt_antal_fall)) %>%
     mutate(
       mean_7_c = rollmean(n_cases, k = 7, fill = NA, align = "center"),
-      mean_7_c_lag = lag(mean_7_c, 7, fill = NA),
+      mean_7_c_lag = lag(mean_7_c, 12, fill = NA),
       lead_ind_cases = log(lag(mean_7_c, 19, fill = NA)),
       mean_7_i = rollmean(n_icu, 7, fill = NA, align = "center"),
       mean_7_i_lag = lag(mean_7_i, 7, fill = NA),
       lead_ind_icu = log(lag(mean_7_i, 14, fill = NA)),
       lead_ind_icu_f = lag(mean_7_i-mean_7_i_lag, 10, fill = NA),
+      lead_ind_icu_d = lag(log(mean_7_i)-log(mean_7_i_lag), 10, fill = NA),
+      lead_ind_icu_d_2 =  lag(log(mean_7_i)-log(mean_7_i_lag), 5, fill = NA),
+      lead_ind_icu_d_rel =  lag((mean_7_i-mean_7_i_lag)/mean_7_i_lag, 5, fill = NA),
+      lead_ind_icu_dc_rel =  lag((mean_7_c-mean_7_c_lag)/mean_7_c_lag, 14, fill = NA),
       ratio_i = lag(mean_7_i / mean_7_i_lag, 7),
       ratio_c = log(lag(mean_7_c / mean_7_c_lag, 7))) %>%
     filter(
@@ -186,7 +190,7 @@ evaluate_nowcast <- function(model, now) {
   stan_mod <- substr(model, 1, 5)
   mod <- cmdstanr::cmdstan_model(paste0("./stan_models/", stan_mod, ".stan"))
   
-  if(model == "mod_a"){
+  if(model %in% c("mod_a", "mod_a_new")){
     samples <- mod$sample(
       data = list(
         T = prep_dat_list$cap_T,
@@ -199,7 +203,7 @@ evaluate_nowcast <- function(model, now) {
       ),
       seed = 1142,
       chains = 4,
-      adapt_delta = 0.9,
+      adapt_delta = 0.95,
       parallel_chains = 4
     )
     save_res <- c("N", "p", "logLambda")
@@ -216,9 +220,9 @@ evaluate_nowcast <- function(model, now) {
         Z = prep_dat_list$Z,
         alpha = rep(1, prep_dat_list$maxDelay+1)
       ),
-      seed = 1142,
+      seed = 2142,
       chains = 4,
-      adapt_delta = 0.9,
+      adapt_delta = 0.95,
       parallel_chains = 4
     )
     save_res <- c("N", "p", "logLambda")
@@ -306,7 +310,7 @@ evaluate_nowcast <- function(model, now) {
     save_res <- c("N", "p", "beta_0", "beta_1", "beta_2", "logLambda")
   }
   
-  if(model == "mod_c_cp"){
+  if(model == "mod_c_ph"){
     samples <- mod$sample(
       data = list(
         T = prep_dat_list$cap_T,
@@ -317,7 +321,7 @@ evaluate_nowcast <- function(model, now) {
         k_wd_haz = dim(aperm(prep_dat_list$W_wd_cp, c(2, 1, 3)))[3],
         W_wd = aperm(prep_dat_list$W_wd_cp, c(2, 1, 3)),
         Z = prep_dat_list$Z,
-        adapt_delta = 0.9,
+        adapt_delta = 0.95,
         alpha = rep(1, prep_dat_list$maxDelay + 1)
       ),
       seed = 1142,
@@ -349,13 +353,58 @@ evaluate_nowcast <- function(model, now) {
     save_res <- c("N", "p", "beta_0", "beta_1", "logLambda")
   }
   
-  if(model %in% c("mod_d_new", "mod_d_ph")){
+  if(model %in% c("mod_d_cp", "mod_d_ph", "mod_d_log")){
     samples <- mod$sample(
       data = list(
         T = prep_dat_list$cap_T,
         D = prep_dat_list$maxDelay,
         r = prep_dat_list$rT,
-        lead_ind = ts$lead_ind_icu_f,
+        lead_ind = ts$lead_ind_icu_d,
+        k_wd_haz = dim(aperm(prep_dat_list$W_wd_cp, c(2, 1, 3)))[3],
+        W_wd = aperm(prep_dat_list$W_wd_cp, c(2, 1, 3)),
+        Z = prep_dat_list$Z,
+        alpha = rep(1, prep_dat_list$maxDelay + 1)
+      ),
+      seed = 1142,
+      chains = 4,
+      parallel_chains = 4,
+      adapt_delta = 0.99,
+      max_treedepth = 15
+    )
+    warn <- names(warnings()) 
+    save_res <- c("N", "p", "beta_0", "beta_1","logLambda")
+  }
+  
+
+  if(model == "mod_d_new2"){
+    samples <- mod$sample(
+      data = list(
+        T = prep_dat_list$cap_T,
+        D = prep_dat_list$maxDelay,
+        r = prep_dat_list$rT,
+        lead_ind = ts$lead_ind_icu_d_rel,
+        k_wd_haz = dim(aperm(prep_dat_list$W_wd_cp, c(2, 1, 3)))[3],
+        W_wd = aperm(prep_dat_list$W_wd_cp, c(2, 1, 3)),
+        Z = prep_dat_list$Z,
+        alpha = rep(1, prep_dat_list$maxDelay + 1)
+      ),
+      seed = 1142,
+      chains = 4,
+      parallel_chains = 4,
+      adapt_delta = 0.99,
+      max_treedepth = 15
+    )
+    warn <- names(warnings()) 
+    save_res <- c("N", "p", "beta_1","logLambda")
+  }
+  
+  if(model == "mod_d_new_cases"){
+    samples <- mod$sample(
+      data = list(
+        T = prep_dat_list$cap_T,
+        D = prep_dat_list$maxDelay,
+        r = prep_dat_list$rT,
+        lead_ind = ts$lead_ind_icu_dc_rel,
         k_wd_haz = dim(aperm(prep_dat_list$W_wd_cp, c(2, 1, 3)))[3],
         W_wd = aperm(prep_dat_list$W_wd_cp, c(2, 1, 3)),
         Z = prep_dat_list$Z,
@@ -368,17 +417,17 @@ evaluate_nowcast <- function(model, now) {
       max_treedepth = 15
     )
     warn <- names(warnings()) 
-    save_res <- c("N", "p", "beta_0", "beta_1","logLambda")
+    save_res <- c("N", "p", "beta_1","logLambda")
   }
   
-  if(model == "mod_e"){
+  if(model %in% c("mod_e", "mod_e_ph")){
     samples <- mod$sample(
       data = list(
         T = prep_dat_list$cap_T,
         D = prep_dat_list$maxDelay,
         r = prep_dat_list$rT,
-        lead_ind_1 = ts$ratio_i,
-        lead_ind_2 = ts$ratio_c,
+        lead_ind_1 = ts$lead_ind_icu_d_rel,
+        lead_ind_2 = ts$lead_ind_icu_dc_rel,
         k_wd_haz = dim(aperm(prep_dat_list$W_wd_cp, c(2, 1, 3)))[3],
         W_wd = aperm(prep_dat_list$W_wd_cp, c(2, 1, 3)),
         Z = prep_dat_list$Z,
@@ -387,7 +436,7 @@ evaluate_nowcast <- function(model, now) {
       seed = 1142,
       chains = 4,
       parallel_chains = 4,
-      adapt_delta = 0.95,
+      adapt_delta = 0.99 ,
       max_treedepth = 15
     )
     warn <- names(warnings()) 
@@ -415,6 +464,7 @@ evaluate_nowcast <- function(model, now) {
     warn <- names(warnings()) 
     save_res <- c("N", "p", "beta_1", "logLambda")
   }
+  
   # Save warnings and results
   samples$cmdstan_diagnose() %>% 
     as.data.frame() %>%
@@ -437,17 +487,19 @@ evaluate_nowcast <- function(model, now) {
 }
 
 # Restrict dataset to a specific nowcast date
-rep_dates <- dat %>%
-  select(rep_date) %>%
-  filter(rep_date >= "2020-09-15") %>%  #, rep_date <= "2021-05-31")  %>%
-  distinct() %>% 
+rep_dates <- list.files(path = paste0("../data/FoHM/")) %>% 
+  str_extract("\\d+-\\d+-\\d+") %>%  
+  as.data.frame %>% distinct() %>% 
+  #dat %>%
+  #select(rep_date) %>%
+  filter(. >= "2020-09-15") %>%  #, rep_date <= "2021-05-31")  %>%
+  #distinct() %>% 
   t() %>%
   as.vector()
 
 
-#for(i in 101:120){
-date <- "2020-11-17" #rep_dates[i]
-model_spec <- "mod_f_ph"
+for(i in 45:45){
+date <- now <- rep_dates[i]
+model_spec <- model <- "mod_a_new"
 lapply(model_spec , evaluate_nowcast, date)
-#}
-
+}

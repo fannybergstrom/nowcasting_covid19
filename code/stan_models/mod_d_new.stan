@@ -1,6 +1,6 @@
 // Model description:
 // Perform Bayesian hierarchical Nowcast with log-linear model for 
-// log(lambda_{t}) = N(beta_0*log(lambda_{t-1}) + beta_1 * lead_ind_1_{t-1} + beta_2 * lead_ind_2_{t-1}), sigma), 
+// log(lambda_{t}) = N(beta_0 * log(lambda_{t-1}) + beta_1 * lead_ind_{t}), sigma), 
 // model observed case counts n_{t,d} ~ NB(lambda[t]*p_{t,d}, phi), 
 // with phi over-dispersion
 // Delay distribution: Discrete time-hazard model with week-day effects
@@ -9,8 +9,7 @@ data {
   int T;              // Number of rows in reporting triangle 
   int D;              // Maximum delay and number of columns of reporting triangle'
   int r[T, D + 1];    // Reporting triangle (Including zero delay)
-  real lead_ind_1[T];   // Lead indicator
-  real lead_ind_2[T];   // Lead indicator
+  real lead_ind[T];   // Lead indicator
   int k_wd_haz;       // Number covariates discrete-time hazard model
   matrix[T, k_wd_haz] W_wd[D + 1];  // Design matrix for discrete hazard model
   matrix[T, D + 1] Z;        // Matrix indicating non-reporting days
@@ -26,7 +25,6 @@ parameters {
   real<lower=0, upper=2> sigma; // Variance parameter for random walk
   real beta_0; // Intercept
   real beta_1; // Association coefficient
-  real beta_2; // Association coefficient
   // reporting model
   // week-day effect
   vector[k_wd_haz] beta_wd_haz;       
@@ -45,7 +43,7 @@ transformed parameters {
   // data model
   real phi;
   // Discrete hazard model
-  gamma = logit((p_bl_pr ./ reverse(cumulative_sum(reverse(p_bl_pr))))[1:D]);
+  gamma = logit((p_bl_pr ./ cumulative_sum(p_bl_pr[(D + 1):1])[(D + 1):1])[1:(D)]);
   
   for (d in 1:(D)){
     h[, d] = inv_logit(gamma[d] + W_wd[d]*beta_wd_haz) .* (rep_vector(1, T) - Z[, d]);
@@ -63,11 +61,13 @@ transformed parameters {
 
 model {
   // Priors
+  beta_0 ~ normal(1, .5);
+  beta_1 ~ normal(0, .5);
   sigma ~ normal(0, .5); // scale of the error-term
   // Random walk
-  logLambda[1] ~ normal(0, 3);
+  logLambda[1] ~ normal(beta_0 * log(fmax(sum(r[1,]),1)) + beta_1 * lead_ind[1], 3);
   for(t in 2:T) {
-    logLambda[t] ~ normal(logLambda[t-1] + beta_1 * lead_ind_1[t] + beta_2 * lead_ind_2[t], sigma);
+    logLambda[t] ~ normal(beta_0 * logLambda[t-1] + beta_1 * lead_ind[t], sigma);
   }
   // Reporting delay
   // Hyper-prior

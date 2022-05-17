@@ -114,7 +114,7 @@ evaluate_nowcast <- function(model, now) {
       }
     }
     
-    # Changepoints (2 weeks)
+    # Changepoints (4 weeks)
     ddChangepoint <- sort((seq(now, begin_date + 14, by = "-2 weeks") + 1)[-1])
     
     W_cp <- array(NA,
@@ -190,7 +190,7 @@ evaluate_nowcast <- function(model, now) {
   stan_mod <- substr(model, 1, 5)
   mod <- cmdstanr::cmdstan_model(paste0("./stan_models/", stan_mod, ".stan"))
   
-  if(model %in% c("mod_a", "mod_a_new")){
+  if(model %in% c("mod_a")){
     samples <- mod$sample(
       data = list(
         T = prep_dat_list$cap_T,
@@ -209,7 +209,7 @@ evaluate_nowcast <- function(model, now) {
     save_res <- c("N", "p", "logLambda")
   }
   
-  if(model %in% c("mod_a_cp", "mod_a_ph")){
+  if(model %in% c("mod_a_cp", "mod_a_ph", "mod_a_4w")){
     samples <- mod$sample(
       data = list(
         T = prep_dat_list$cap_T,
@@ -376,7 +376,7 @@ evaluate_nowcast <- function(model, now) {
   }
   
 
-  if(model == "mod_d_new2"){
+  if(model %in% c("mod_d_new2", "mod_d_4w")){
     samples <- mod$sample(
       data = list(
         T = prep_dat_list$cap_T,
@@ -500,6 +500,6 @@ rep_dates <- list.files(path = paste0("../data/FoHM/")) %>%
 
 for(i in 45:45){
 date <- now <- rep_dates[i]
-model_spec <- model <- "mod_a_new"
+model_spec <- model <- "mod_a_ph"
 lapply(model_spec , evaluate_nowcast, date)
 }

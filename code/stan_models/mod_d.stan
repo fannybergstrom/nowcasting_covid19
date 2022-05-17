@@ -19,7 +19,7 @@ data {
 
 parameters {
   simplex[D + 1] p_bl_pr; // delay probabilities
-  vector[T] epsilon;   // Error log-linear model (scaled by sigma)
+  //vector[T] epsilon;   // Error log-linear model (scaled by sigma)
   vector[T] logLambda; // expected number of cases at time t in strata s
   // epi-curve model
   real<lower=0, upper=2> sigma; // Variance parameter for random walk
@@ -67,7 +67,7 @@ model {
   // Random walk
   logLambda[1] ~ normal(0 + beta_1 * lead_ind[1], 3);
   for(t in 2:T) {
-    logLambda[t] ~ normal( logLambda[t-1] + beta_1 * lead_ind[t], sigma^2 * epsilon[t]^2);
+    logLambda[t] ~ normal( logLambda[t-1] + beta_1 * lead_ind[t], sigma^2);
   }
   // Reporting delay
   // Hyper-prior
@@ -75,11 +75,10 @@ model {
   sd_beta_wd_haz ~ normal(0, 0.5);
   // Prior
   beta_wd_haz ~ normal(0, sd_beta_wd_haz);
-  reciprocal_phi ~uniform(0,1);
-  // log-Lambda
-  epsilon ~ std_normal();
+  reciprocal_phi ~ uniform(0,1);
+  // Log-Lambda
+  //epsilon ~ std_normal();
   // Model for observed counts
-  
   for (t in 1:T) {
     for (d in 0:min(T - t, D)) {
       if (p[t, d + 1] > 0){

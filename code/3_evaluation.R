@@ -45,10 +45,14 @@ n <- 140
 files_mod_a <- list_files("N", "mod_a_ph")[1:n]
 files_mod_b <- list_files("N", "mod_b_cp")[1:n]
 files_mod_b_c <- list_files("N", "mod_b_cases")[1:n]
-files_mod_c <- c(list_files("N", "mod_c_ph")[1:n]
+files_mod_c <- list_files("N", "mod_c_ph")[1:n]
 files_mod_d <- list_files("N", "mod_d_new2")[1:n]
 files_mod_d_c <- list_files("N", "mod_d_new_cases")[1:n]
 files_mod_e <- list_files("N", "mod_e_ph")[1:n]
+
+files_mod_a <- files_mod_a[21:137]
+files_mod_b <- files_mod_b[21:137]
+files_mod_d <- files_mod_d[21:137]
 
 # Read files
 N_mod_a <- lapply(paste0("../results/N/", files_mod_a), read_csv)
@@ -170,20 +174,6 @@ for(i in 1:length(N_mod_e)){
   N_e_df <- bind_rows(N_e_df, post_N)
 }
 
-#N_f_df <- c()
-#for(i in 1:length(N_mod_f)){
-#  N <-N_mod_f[[i]]
-#  now <- ymd(rep_dates[i])
-#  start <- now - 7 * 8 + 1
-  
-#  post_N = tibble(date = seq(start, now, "1 day"),
-#                  med_f = apply(N, 2, median),
-#                  q5_f = apply(N, 2, function(x) quantile(x, .025)),
-#                  q95_f = apply(N, 2, function(x) quantile(x, .975))) %>% 
-#    mutate(now = now, delay = 55:0, weekday = wday(now, label = F))
-  
-#  N_f_df <- bind_rows(N_f_df, post_N)
-#}
 
 ##### Scores
 log_a <- c()
@@ -391,4 +381,40 @@ err_df <- N_a_df %>% filter(delay == max_delay) %>% select(date, med_a,q5_a,q95_
          crps_e_7 = apply(crps_e_7, 1, mean)
     )
 
-write_csv(err_df, "../results/results_20220511.csv")
+write_csv(err_df, "../results/results_20220421.csv")
+
+rep_dates<-rep_dates[21:137]
+rep_dates <- as.Date(rep_dates)
+rep_d <- seq(as.Date("2020-04-20"), as.Date("2021-05-21"), by = "days") %>% as.data.frame() 
+retro_truth <- rep_d %>% left_join(retro_truth) %>% mutate(n_true_retro = replace_na(n_true_retro, 0))
+# Decreasing score
+
+log_a <- matrix(NA, 56, length(N_mod_a))
+crps_a <- matrix(NA, 56, length(N_mod_a))
+for(j in 1:56){
+ for(i in 1:(length(N_mod_a))){
+  v <- N_mod_a[[i]][,56-j+1] %>% unlist()
+  truth <- retro_truth %>% filter(date == rep_dates[i]-j+1) %>% select(n_true_retro) %>% unlist()
+  log_a[j,i]  <- logs(y = v, family = "negative-binomial", mu = truth, size = 1) %>% mean()
+  #crps_a[j,i] <- crps(y = v, family = "negative-binomial", mu = truth, size = 1) %>% mean()
+  }
+}
+
+apply(log_a_all, 1, mean)
+apply(crps_a_all, 1, mean)
+
+
+names(rep_d) <- "date"
+retro_truth <- retro_truth %>% right_join(rep_d)
+retro_truth[is.na.POSIXlt(retro_truth$n_true_retro),]
+
+err_d_all <- log_d_all<- crps_d_all <- matrix(NA, length(N_mod_d), 56)
+for(i in 1:length(N_mod_d)){
+  for(j in 1:56){
+    v <- N_mod_d[[i]][,56+1-j] %>% unlist()
+    truth <- retro_truth %>% filter(date == as.Date(rep_dates[i]-j+1)) %>% select(n_true_retro) %>% unlist()
+    log_d_all[i,j] <- logs(y = v, family = "negative-binomial", mu = truth, size = 1) %>% mean()
+    crps_d_all[i,j] <- crps(y = v, family = "negative-binomial", mu = truth, size = 1) %>% mean()
+  }
+}
+

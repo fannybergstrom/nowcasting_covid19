@@ -37,18 +37,15 @@ evaluate_nowcast <- function(model, now) {
     left_join(FHM_cases %>% select(date = Statistikdatum, n_cases = Totalt_antal_fall)) %>%
     mutate(
       mean_7_c = rollmean(n_cases, k = 7, fill = NA, align = "center"),
-      mean_7_c_lag = lag(mean_7_c, 12, fill = NA),
-      lead_ind_cases = log(lag(mean_7_c, 19, fill = NA)),
+      mean_7_c_lag = lag(mean_7_c, 7, fill = NA),
+      lead_ind_cases_modL = log(lag(mean_7_c, 19, fill = NA)),
       mean_7_i = rollmean(n_icu, 7, fill = NA, align = "center"),
       mean_7_i_lag = lag(mean_7_i, 7, fill = NA),
       lead_ind_icu = log(lag(mean_7_i, 14, fill = NA)),
-      lead_ind_icu_f = lag(mean_7_i-mean_7_i_lag, 10, fill = NA),
-      lead_ind_icu_d = lag(log(mean_7_i)-log(mean_7_i_lag), 10, fill = NA),
-      lead_ind_icu_d_2 =  lag(log(mean_7_i)-log(mean_7_i_lag), 5, fill = NA),
-      lead_ind_icu_d_rel =  lag((mean_7_i-mean_7_i_lag)/mean_7_i_lag, 5, fill = NA),
-      lead_ind_icu_dc_rel =  lag((mean_7_c-mean_7_c_lag)/mean_7_c_lag, 14, fill = NA),
+      lead_ind_icu_d_rel =  lag((mean_7_i-mean_7_i_lag)/mean_7_i_lag, 7, fill = NA),
+      lead_ind_icu_dc_rel =  lag((mean_7_c-mean_7_c_lag)/mean_7_c_lag, 12, fill = NA),
       ratio_i = lag(mean_7_i / mean_7_i_lag, 7),
-      ratio_c = log(lag(mean_7_c / mean_7_c_lag, 7))) %>%
+      ratio_c = lag(mean_7_c / mean_7_c_lag, 12)) %>%
     filter(
       date <= now,
       date >= start - 1
@@ -209,7 +206,7 @@ evaluate_nowcast <- function(model, now) {
     save_res <- c("N", "p", "logLambda")
   }
   
-  if(model %in% c("mod_a_cp", "mod_a_ph", "mod_a_4w")){
+  if(model %in% c("mod_a_cp", "mod_a_ph")){
     samples <- mod$sample(
       data = list(
         T = prep_dat_list$cap_T,
@@ -498,7 +495,7 @@ rep_dates <- list.files(path = paste0("../data/FoHM/")) %>%
   as.vector()
 
 
-for(i in 45:45){
+for(i in 53:53){
 date <- now <- rep_dates[i]
 model_spec <- model <- "mod_a_ph"
 lapply(model_spec , evaluate_nowcast, date)

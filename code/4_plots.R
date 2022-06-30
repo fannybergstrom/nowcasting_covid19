@@ -6,13 +6,17 @@ library(lubridate)
 library(readxl)
 library(wesanderson)
 library(ggpubr)
-library("ggsci")
-
-
+library(ggsci)
+library(extrafont)
+loadfonts(device = "win")
+setwd("/media/fabe4028/suhome/Documents/GitHub/nowcasting_covid19/code")
 
 # Import COVID data and Nowcast results
 dat <- read_csv("../data/covid_deaths.csv")
 res_df <- read_csv("../results/results_20220421.csv") %>% filter(date >= "2020-10-20", date <="2021-05-21")
+
+dat %>% filter(death_date >= "2020-10-20", death_date <="2021-05-21") %>% #nrow()
+  mutate(delay = rep_date -death_date) %>% filter(delay > 35) %>% nrow()
 
 # Plot theme and color
 theme_set(theme_bw())
@@ -38,16 +42,18 @@ left_join(dat_mod %>% group_by(date=death_date) %>%
   ylab("Number Fatalities") +
   xlab("Date") +
   scale_x_date(breaks = as.Date(c("2022-01-01", "2022-01-07", "2022-01-13", "2022-01-19", 
-                                  "2022-01-26", "2022-02-01")), date_labels = "%y-%m-%d")+
+                                  "2022-01-26", "2022-02-01")), date_labels = "%y-%m-%d", expand=c(0.02,0.02))+
   theme(legend.background = element_blank(),
         legend.title = element_blank(),
-        legend.position = "bottom") +
+        legend.position = "bottom",
+        text = element_text(size = 8, family="TT Arial")) +
   scale_fill_manual(values = c("Reported"="grey30","Occurred but not yet reported" = "gray" ))
 
 obs_plot
 
-ggsave(paste0("../plots/obs_", now, ".png"), obs_plot, height = 4, width = 6)
-
+ggsave(paste0("../plots/obs_", now, ".png"), units="in", dpi = 300, obs_plot, height = 3.5, width = 5.2)
+ggsave(paste0("../plots/fig1.png"), units="in", dpi = 300, obs_plot, height = 3.5, width = 5.2)
+ggsave(paste0("../plots/fig1.tiff"), units="in", dpi = 300, obs_plot, height = 3.5, width = 5.2, compression = 'lzw')
 
 ## Error plots
 
@@ -314,13 +320,10 @@ rep_plot_a <- res_df %>%
                      labels=c("R", "True number"))+
   scale_linetype_manual(values = c(1, 2),
                         labels=c("R", "True number"))
-
-
 rep_plot_a
 
 ggsave(paste0("../plots/res_moda.png"), rep_plot_a, width = 5,
        height = 3)
-
 
 rep_plot_d <- res_df %>%
   pivot_longer(c(med_d, n_true_retro)) %>% 
@@ -331,7 +334,7 @@ rep_plot_d <- res_df %>%
   xlab("Date") +
   coord_cartesian(ylim = c(0, 250))+
   scale_x_date(date_breaks = "1 month", date_labels = "%y-%m-%d", 
-               limits = c(as.Date("2020-10-20"), as.Date("2021-05-21")), expand=c(0,0)) +
+               limits = c(as.Date("2020-10-20"), as.Date("2021-05-21"))) +
   theme(legend.background = element_blank(),
         legend.position = "bottom",
         legend.title = element_blank())+
@@ -393,7 +396,7 @@ rep_plot5 <-  res_df %>%
   geom_ribbon(aes(date, ymin=q5_b_c, ymax=q95_b_c), fill=wes_cols[10], alpha=.2) +
   ylab("Number Fatalities") +
   xlab("Date") +
-  ylim(0,360)+
+  coord_cartesian(ylim = c(0, 350))+
   scale_x_date(date_breaks = "1 month", 
                date_labels = "%y-%m-%d") +
   theme(legend.background = element_blank(),
@@ -411,7 +414,7 @@ rep_plot_c <-  res_df %>%
   geom_ribbon(aes(date, ymin=q5_c, ymax=q95_c), fill=wes_cols[11], alpha=.2) +
   ylab("Number Fatalities") +
   xlab("Date") +
-  #ylim(0,360)+
+  coord_cartesian(ylim = c(0, 350))+
   scale_x_date(date_breaks = "1 month", 
                date_labels = "%y-%m-%d") +
   theme(legend.background = element_blank(),
@@ -429,7 +432,7 @@ rep_plot6 <- res_df %>%
   geom_ribbon(aes(date, ymin=q5_d_c, ymax=q95_d_c), fill=wes_cols[9], alpha=.2) +
   ylab("Number Fatalities") +
   xlab("Date") +
-  ylim(0,360)+
+  coord_cartesian(ylim = c(0, 250))+
   scale_x_date(date_breaks = "1 month", date_labels = "%y-%m-%d") +
   theme(legend.background = element_blank(),
         legend.position = "bottom",
@@ -442,15 +445,27 @@ ggsave(paste0("../plots/res_mod_e.png"), rep_plot6, width = 5,
        height = 3)
 
 ## Single reporting day
+# Restrict dataset to a specific nowcast date
+rep_dates <- list.files(path = paste0("../data/FoHM/")) %>% 
+  str_extract("\\d+-\\d+-\\d+") %>%  
+  as.data.frame %>% distinct() %>% 
+  #dat %>%
+  #select(rep_date) %>%
+  filter(. >= "2020-09-15") %>%  #, rep_date <= "2021-05-31")  %>%
+  #distinct() %>% 
+  t() %>%
+  as.vector()
+
 n <- 60
 now <- ymd(rep_dates[n])
 start <- ymd(now - 7*8+1)
 dat_mod = dat %>%
   filter(rep_date <= now)
 
-N_a <-N_mod_a[[n]]
-N_b <-N_mod_b[[n]]
-N_d <-N_mod_d[[n]]
+m <-40
+N_a <-N_mod_a[[m]]
+N_b <-N_mod_b[[m]]
+N_d <-N_mod_d[[m]]
 post_N_a <- tibble(date = seq(now-(55), now, "1 day"),
                    med_a=apply(N_a, 2, median), 
                    q5_a =apply(N_a, 2, function(x) quantile(x, .025)),
@@ -482,13 +497,14 @@ snap_res_1 <- dat_mod %>% group_by(date=death_date) %>%
   geom_col(aes(date, n_obs/2)) +
   ylab("Number Fatalities") +
   xlab("Date") +
-  coord_cartesian(ylim = c(0, 165))+
+  coord_cartesian(ylim = c(0, 160))+
   theme(legend.background = element_blank(),
         legend.position = "bottom",
-        legend.title = element_blank())+
+        legend.title = element_blank(),
+        text = element_text(size = 8, family="TT Arial"))+
   scale_color_manual(values = c(med_a = wes_cols[4], n_true_retro = wes_cols[1]),
                      labels = c("R", "True number"))+
-  scale_x_date(breaks = dates, date_labels = "%y-%m-%d")+
+  scale_x_date(breaks = dates, date_labels = "%y-%m-%d", expand=c(0.02,0.02))+
   scale_linetype_manual(values = c(med_a = 1, n_true_retro = 2),
                         labels=c("R","True number")) 
   
@@ -496,6 +512,8 @@ snap_res_1
 
 ggsave(paste0("../plots/snap_res1.png"), snap_res_1, width = 3.5,
        height = 3)
+ggsave(paste0("../plots/fig4.png"), units="in", dpi = 300, snap_res_1, height = 3.5, width = 5.2)
+ggsave(paste0("../plots/fig4.tiff"), units="in", dpi = 300, snap_res_1, height = 3.5, width = 5.2, compression = 'lzw')
 
 
 snap_res_2 <- dat_mod %>% group_by(date=death_date) %>%
@@ -504,7 +522,7 @@ snap_res_2 <- dat_mod %>% group_by(date=death_date) %>%
   left_join(post_N_b) %>%
   left_join(dat %>% group_by(date=death_date) %>%
               summarise(n_true_retro=n())) %>%
-  mutate_if(is.integer, ~replace(., is.na(.), 0)) %>%
+  mutate_if(is.integer, ~replace(., is.na(.), 0)) %>% 
   filter(date > (now-36)) %>%
   pivot_longer(c(med_b, n_true_retro)) %>% 
   ggplot() + 
@@ -513,13 +531,14 @@ snap_res_2 <- dat_mod %>% group_by(date=death_date) %>%
   geom_col(aes(date, n_obs/2)) +
   ylab("Number Fatalities") +
   xlab("Date") +
-  coord_cartesian(ylim = c(0, 165))+
+  coord_cartesian(ylim = c(0, 160))+
   theme(legend.background = element_blank(),
         legend.position = "bottom",
-        legend.title = element_blank())+
+        legend.title = element_blank(),
+        text = element_text(size = 8, family="TT Arial"))+
   scale_color_manual(values = c(med_b = wes_cols[6], n_true_retro = wes_cols[1]),
                      labels = c("L(ICU)", "True number"))+
-  scale_x_date(breaks = dates, date_labels = "%y-%m-%d")+
+  scale_x_date(breaks = dates, date_labels = "%y-%m-%d", expand=c(0.02,0.02))+
   scale_linetype_manual(values = c(med_b = 1, n_true_retro = 2),
                         labels=c("L(ICU)","True number")) 
 
@@ -548,10 +567,11 @@ snap_res_3 <- dat_mod %>% group_by(date=death_date) %>%
   coord_cartesian(ylim = c(0, 165))+
   theme(legend.background = element_blank(),
         legend.position = "bottom",
-        legend.title = element_blank())+
+        legend.title = element_blank(),
+        text = element_text(size = 8, family="TT Arial"))+
   scale_color_manual(values = c(med_d = wes_cols[5], n_true_retro = wes_cols[1]),
                      labels = c("RL(ICU)", "True number"))+
-  scale_x_date(breaks = dates, date_labels = "%y-%m-%d")+
+  scale_x_date(breaks = dates, date_labels = "%y-%m-%d", expand=c(0.02,0.02))+
   scale_linetype_manual(values = c(med_d = 1, n_true_retro = 2),
                         labels=c("RL(ICU)","True number")) 
 
@@ -563,60 +583,82 @@ ggsave(paste0("../plots/snap_res3.png"), snap_res_3, width = 3.5,
 
 #### PI
 pi_a_95 <- c()
-n_e <- 145 # nrow(res_df)
-for(i in 1:n_e){
-  #if(i != 73){
+rep <- rep_dates[21:137]
+l <- 117 # nrow(res_df)
+for(i in 1:l){
   v1 <- N_mod_a[[i]][,56] %>% unlist()
-  n <- retro_truth %>% filter(date == rep_dates[i]) %>% select(n_true_retro) %>% unlist()
+  n <- retro_truth %>% filter(date == rep[i]) %>% select(n_true_retro) %>% unlist()
   pi_a_95[i] <-between(n, quantile(v1, .025), quantile(v1, .975))
-  #}
 }
-sum(na.omit(pi_a_95[18:132]))/115
+sum(na.omit(pi_a_95))/l
 
 pi_a_90 <- c()
-for(i in 1:n_e){
+for(i in 1:l){
   v1 <- N_mod_a[[i]][,56] %>% unlist()
-  n <- retro_truth %>% filter(date == rep_dates[i]) %>% select(n_true_retro) %>% unlist()
-  pi_a_90[i] <-between(n, quantile(v1, .05), quantile(v1, .95))}
+  n <- retro_truth %>% filter(date == rep[i]) %>% select(n_true_retro) %>% unlist()
+  pi_a_90[i] <-between(n, quantile(v1, .05), quantile(v1, .95))
+}
+sum(na.omit(pi_a_90))/l
 
-sum(na.omit(pi_a_90[18:132]))/115
+pi_a_75 <- c()
+for(i in 1:l){
+  v1 <- N_mod_a[[i]][,56] %>% unlist()
+  n <- retro_truth %>% filter(date == rep[i]) %>% select(n_true_retro) %>% unlist()
+  pi_a_75[i] <-between(n, quantile(v1, .125), quantile(v1, .875))
+}
+sum(na.omit(pi_a_75))/l
+
 
 pi_b_95 <- c()
-for(i in 1:145){
-  
+for(i in 1:l){
   v1 <- N_mod_b[[i]][,56] %>% unlist()
-  n <- retro_truth %>% filter(date == rep_dates[i]) %>% select(n_true_retro) %>% unlist()
-  try(pi_b_95[i] <-between(n, quantile(v1, .025), quantile(v1, .975)))
+  n <- retro_truth %>% filter(date == rep[i]) %>% select(n_true_retro) %>% unlist()
+  pi_b_95[i] <-between(n, quantile(v1, .025), quantile(v1, .975))
 }
-sum(na.omit(pi_b_95[18:132]))/115
-
+sum(na.omit(pi_b_95))/l
 
 pi_b_90 <- c()
-for(i in 1:145){
+for(i in 1:l){
   v1 <- N_mod_b[[i]][,56] %>% unlist()
-  n <- retro_truth %>% filter(date == rep_dates[i]) %>% select(n_true_retro) %>% unlist()
+  n <- retro_truth %>% filter(date == rep[i]) %>% select(n_true_retro) %>% unlist()
   pi_b_90[i] <-between(n, quantile(v1, .05), quantile(v1, .95))
 }
-(sum(na.omit(pi_b_90[18:132])))/115
+sum(na.omit(pi_b_90))/l
 
-
-pi_d_95 <- c()
-for(i in 1:145){
-  
-  v1 <- N_mod_d[[i]][,56] %>% unlist()
-  n <- retro_truth %>% filter(date == rep_dates[i]) %>% select(n_true_retro) %>% unlist()
-  try(pi_d_95[i] <-between(n, quantile(v1, .025), quantile(v1, .975)))
+pi_b_75 <- c()
+for(i in 1:l){
+  v1 <- N_mod_b[[i]][,56] %>% unlist()
+  n <- retro_truth %>% filter(date == rep[i]) %>% select(n_true_retro) %>% unlist()
+  pi_b_75[i] <-between(n, quantile(v1, .125), quantile(v1, .875))
 }
-sum(na.omit(pi_d_95[18:132]))/115
+sum(na.omit(pi_b_75))/l
 
+pi_b_75 <- pi_b_90 <- pi_b_95 <- c()
+for(i in 1:l){
+  v1 <- N_mod_b[[i]][,56] %>% unlist()
+  n <- retro_truth %>% filter(date == rep[i]) %>% select(n_true_retro) %>% unlist()
+  pi_b_75[i] <-between(n, quantile(v1, .125), quantile(v1, .875))
+  pi_b_90[i] <-between(n, quantile(v1, .05), quantile(v1, .95))
+  pi_b_95[i] <-between(n, quantile(v1, .025), quantile(v1, .975))
+}
+sum(na.omit(pi_b_95))/l
+sum(na.omit(pi_b_90))/l
+sum(na.omit(pi_b_75))/l
 
-pi_d_90 <- c()
-for(i in 1:145){
+pi_d_75 <- pi_d_90 <- pi_d_95 <- c()
+for(i in 1:l){
   v1 <- N_mod_d[[i]][,56] %>% unlist()
-  n <- retro_truth %>% filter(date == rep_dates[i]) %>% select(n_true_retro) %>% unlist()
+  n <- retro_truth %>% filter(date == rep[i]) %>% select(n_true_retro) %>% unlist()
+  pi_d_75[i] <-between(n, quantile(v1, .125), quantile(v1, .875))
   pi_d_90[i] <-between(n, quantile(v1, .05), quantile(v1, .95))
+  pi_d_95[i] <-between(n, quantile(v1, .025), quantile(v1, .975))
 }
-sum(na.omit(pi_d_90[18:132]))/115
+sum(na.omit(pi_d_95))/l
+sum(na.omit(pi_d_90))/l
+sum(na.omit(pi_d_75))/l
+
+
+
 
 
 # Beta 0
@@ -634,7 +676,7 @@ beta_0_plot <- res_beta_0 %>%
   scale_color_manual(values = c("L(ICU)" = wes_cols[7]))
 beta_0_plot
 
-ggsave(paste0("../plots/beta_0_mod_b.png"), beta_0_plot, width = 7,
+ggsave(paste0("../plots/beta_0_mod_b.png"), beta_0_plot, width = 6,
        height = 4)
 
 # Beta 1
@@ -652,7 +694,7 @@ beta_1_plot <- res_beta_1 %>%
   scale_color_manual(values = c("L(ICU)" = wes_cols[8]))
 beta_1_plot
 
-ggsave(paste0("../plots/beta_1_mod_b.png"), beta_1_plot, width = 7,
+ggsave(paste0("../plots/beta_1_mod_b.png"), beta_1_plot, width = 6,
        height = 4)
 
 
@@ -670,7 +712,7 @@ beta_1_plot_d <- res_beta_1_d %>%
   scale_color_manual(values = c("RL(ICU)" = wes_cols[9]))
 beta_1_plot_d
 
-ggsave(paste0("../plots/beta_1_mod_d.png"), beta_1_plot_d, width = 7,
+ggsave(paste0("../plots/beta_1_mod_d.png"), beta_1_plot_d, width = 6,
        height = 4)
 
 

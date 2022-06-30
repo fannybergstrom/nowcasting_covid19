@@ -273,7 +273,7 @@ for(i in 1:length(N_mod_d)){
 }
 
 err_d_7 <- log_d_7 <- crps_d_7 <- matrix(NA, length(N_mod_d), 7)
-for(i in 1:length(N_mod_d_c)){
+for(i in 1:length(N_mod_d)){
   for(j in 1:7){
     v <- N_mod_d[[i]][,56+1-j] %>% unlist()
     truth <- retro_truth %>% filter(date == as.Date(rep_dates[i])-j+1) %>% select(n_true_retro) %>% unlist()
@@ -400,21 +400,95 @@ for(j in 1:56){
   }
 }
 
-apply(log_a_all, 1, mean)
-apply(crps_a_all, 1, mean)
+apply(log_d_all, 2, median)
+apply(crps_d_all[1:2,], 2, median)
 
 
 names(rep_d) <- "date"
 retro_truth <- retro_truth %>% right_join(rep_d)
 retro_truth[is.na.POSIXlt(retro_truth$n_true_retro),]
 
-err_d_all <- log_d_all<- crps_d_all <- matrix(NA, length(N_mod_d), 56)
+err_a_all <- log_a_all<- crps_a_all <- matrix(NA, length(N_mod_a), 56)
 for(i in 1:length(N_mod_d)){
   for(j in 1:56){
-    v <- N_mod_d[[i]][,56+1-j] %>% unlist()
+    v <- N_mod_a[[i]][,(56+1-j)] %>% unlist()
+    truth <- retro_truth %>% filter(date == as.Date(rep_dates[i]-j+1)) %>% select(n_true_retro) %>% unlist()
+    log_a_all[i,j] <- logs(y = v, family = "negative-binomial", mu = truth, size = 1) %>% mean()
+    crps_a_all[i,j] <- crps(y = v, family = "negative-binomial", mu = truth, size = 1) %>% mean()
+  }
+}
+
+err_b_all <- log_d_all<- crps_d_all <- matrix(NA, length(N_mod_d), 56)
+for(i in 1:length(N_mod_d)){
+  for(j in 1:56){
+    v <- N_mod_d[[i]][,(56+1-j)] %>% unlist()
     truth <- retro_truth %>% filter(date == as.Date(rep_dates[i]-j+1)) %>% select(n_true_retro) %>% unlist()
     log_d_all[i,j] <- logs(y = v, family = "negative-binomial", mu = truth, size = 1) %>% mean()
     crps_d_all[i,j] <- crps(y = v, family = "negative-binomial", mu = truth, size = 1) %>% mean()
   }
 }
+
+err_d_all <- log_d_all<- crps_d_all <- matrix(NA, length(N_mod_d), 56)
+for(i in 1:length(N_mod_d)){
+  for(j in 1:56){
+    v <- N_mod_d[[i]][,(56+1-j)] %>% unlist()
+    truth <- retro_truth %>% filter(date == as.Date(rep_dates[i]-j+1)) %>% select(n_true_retro) %>% unlist()
+    log_d_all[i,j] <- logs(y = v, family = "negative-binomial", mu = truth, size = 1) %>% mean()
+    crps_d_all[i,j] <- crps(y = v, family = "negative-binomial", mu = truth, size = 1) %>% mean()
+  }
+}
+
+plot(0:35, apply(crps_a_all[1:117,21:56], 2, median))
+plot(0:35, apply(crps_a_all[c(1:40),21:56], 2, median))
+
+plot(0:35, apply(crps_d_all[1:117,21:56], 2, median))
+plot(0:35, apply(crps_d_all[1:80,21:56], 2, median))
+
+apply(crps_d_all[1:117,49:56], 2, mean) %>% mean()
+
+apply(crps_a_all[1:117,1:7], 2, mean) %>% mean()
+apply(crps_d_all[1:117,1:7], 2, mean) %>% mean()
+
+err_b_117 <- log_b_117 <- crps_b_117 <- matrix(NA, length(N_mod_b), 36)
+for(i in 1:length(N_mod_a)){
+  for(j in 1:36){
+    v <- N_mod_b[[i]][,(56+1-j)] %>% unlist()
+    truth <- retro_truth %>% filter(date == as.Date(rep_dates[i]-j+1)) %>% select(n_true_retro) %>% unlist()
+    err_b_117[i,j] <- abs(median(v)-truth)
+    log_b_117[i,j] <- logs(y = v, family = "negative-binomial", mu = truth, size = 1) %>% mean()
+    crps_b_117[i,j] <- crps(y = v, family = "negative-binomial", mu = truth, size = 1) %>% mean()
+  }
+}
+
+err_d_117 <- log_d_117 <- crps_d_117 <- matrix(NA, length(N_mod_d), 36)
+for(i in 1:length(N_mod_d)){
+  for(j in 1:36){
+    v <- N_mod_d[[i]][,56+1-j] %>% unlist()
+    truth <- retro_truth %>% filter(date == as.Date(rep_dates[i])-j+1) %>% select(n_true_retro) %>% unlist()
+    err_d_117[i,j] <- abs(median(v)-truth)
+    log_d_117[i,j] <- logs(y = v, family = "negative-binomial", mu = truth, size = 1) %>% mean()
+    crps_d_117[i,j] <- crps(y = v, family = "negative-binomial", mu = truth, size = 1) %>% mean()
+  }
+}
+
+err_a_117 <- log_a_117 <- crps_a_117 <- matrix(NA, length(N_mod_a), 36)
+for(i in 1:length(N_mod_a)){
+  for(j in 1:36){
+    v <- N_mod_a[[i]][,(56+1-j)] %>% unlist()
+    truth <- retro_truth %>% filter(date == as.Date(rep_dates[i]-j+1)) %>% select(n_true_retro) %>% unlist()
+    err_a_117[i,j] <- abs(median(v)-truth)
+    log_a_117[i,j] <- logs(y = v, family = "negative-binomial", mu = truth, size = 1) %>% mean()
+    crps_a_117[i,j] <- crps(y = v, family = "negative-binomial", mu = truth, size = 1) %>% mean()
+  }
+}
+
+bind_cols(lapply(c(err_a_117, err_b_117, err_d_117), mean, 2))
+
+plot(0:35, apply(err_a_117, 2, mean))
+
+plot(0:35, apply(crps_a_117[1:117,], 2, mean))
+plot(0:35, apply(crps_a_117[1:117,], 2, mean))
+plot(0:35, apply(crps_d_117[1:117,], 2, mean))
+
+plot(0:35, apply(log_a_117[1:50,], 2, median))
 

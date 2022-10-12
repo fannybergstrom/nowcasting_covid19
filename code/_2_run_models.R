@@ -43,7 +43,7 @@ evaluate_nowcast <- function(model, now, max_delay = 35) {
       mean_7_i = rollmean(n_icu, 7, fill = NA, align = "center"),
       mean_7_i_lag = lag(mean_7_i, 7, fill = NA),
       lead_ind_icu = log(lag(mean_7_i, 14, fill = NA)),
-      lead_ind_icu_d_rel =  lag((mean_7_i-mean_7_i_lag)/mean_7_i_lag, 7, fill = NA),
+      lead_ind_icu_d_rel =  lag((mean_7_i-mean_7_i_lag), 7, fill = NA),
       lead_ind_icu_dc_rel =  lag((mean_7_c-mean_7_c_lag)/mean_7_c_lag, 12, fill = NA)) %>%
     filter(
       date <= now,
@@ -189,7 +189,7 @@ evaluate_nowcast <- function(model, now, max_delay = 35) {
   
   mod <- cmdstanr::cmdstan_model(paste0("./stan_models/", model, ".stan"))
   
-  if(model == c"mod_r"){
+  if(model == "mod_r"){
     samples <- mod$sample(
       data = list(
         T = prep_dat_list$cap_T,
@@ -200,9 +200,9 @@ evaluate_nowcast <- function(model, now, max_delay = 35) {
         Z = prep_dat_list$Z,
         alpha = rep(1, prep_dat_list$maxDelay+1)
       ),
-      seed = 2142,
+      seed = 1142,
       chains = 4,
-      adapt_delta = 0.95,
+      adapt_delta = 0.98,
       parallel_chains = 4
     )
     save_res <- c("N", "p", "logLambda")
@@ -317,7 +317,7 @@ evaluate_nowcast <- function(model, now, max_delay = 35) {
         T = prep_dat_list$cap_T,
         D = prep_dat_list$maxDelay,
         r = prep_dat_list$rT,
-        lead_ind = ts$lead_ind_icu_d,
+        lead_ind = ts$lead_ind_icu_d_rel,
         k_wd_haz = dim(aperm(prep_dat_list$W_wd_cp, c(2, 1, 3)))[3],
         W_wd = aperm(prep_dat_list$W_wd_cp, c(2, 1, 3)),
         Z = prep_dat_list$Z,
@@ -326,7 +326,7 @@ evaluate_nowcast <- function(model, now, max_delay = 35) {
       seed = 1142,
       chains = 4,
       parallel_chains = 4,
-      adapt_delta = 0.99,
+      adapt_delta = 0.98,
       max_treedepth = 15
     )
     warn <- names(warnings()) 
@@ -345,7 +345,7 @@ evaluate_nowcast <- function(model, now, max_delay = 35) {
         Z = prep_dat_list$Z,
         alpha = rep(1, prep_dat_list$maxDelay + 1)
       ),
-      seed = 1142,
+      seed = 4142,
       chains = 4,
       parallel_chains = 4,
       adapt_delta = 0.99,
@@ -458,6 +458,7 @@ rep_dates <- list.files(path = paste0("../data/FoHM/")) %>%
 
 for(i in 60:60){
   date <- now <- rep_dates[i]
-  model_spec <- model <- "mod_r"
+  model_spec <- model <- "mod_rl"
   lapply(model_spec , evaluate_nowcast, date)
 }
+

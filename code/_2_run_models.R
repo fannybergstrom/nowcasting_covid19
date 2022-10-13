@@ -39,12 +39,12 @@ evaluate_nowcast <- function(model, now, max_delay = 35) {
     mutate(
       mean_7_c = rollmean(n_cases, k = 7, fill = NA, align = "center"),
       mean_7_c_lag = lag(mean_7_c, 7, fill = NA),
-      lead_ind_cases_mod_l = log(lag(mean_7_c, 19, fill = NA)),
+      lead_ind_cases_mod_l = lag(mean_7_c, 19, fill = NA),
       mean_7_i = rollmean(n_icu, 7, fill = NA, align = "center"),
       mean_7_i_lag = lag(mean_7_i, 7, fill = NA),
-      lead_ind_icu = log(lag(mean_7_i, 14, fill = NA)),
-      lead_ind_icu_d_rel =  lag((mean_7_i-mean_7_i_lag), 7, fill = NA),
-      lead_ind_icu_dc_rel =  lag((mean_7_c-mean_7_c_lag)/mean_7_c_lag, 12, fill = NA)) %>%
+      lead_ind_icu = lag(mean_7_i, 14, fill = NA),
+      lead_ind_icu_rl =  lag((mean_7_i-mean_7_i_lag), 7, fill = NA),
+      lead_ind_icu_dc_rel =  lag(mean_7_c-mean_7_c_lag, 12, fill = NA)) %>%
     filter(
       date <= now,
       date >= start - 1
@@ -208,28 +208,7 @@ evaluate_nowcast <- function(model, now, max_delay = 35) {
     save_res <- c("N", "p", "logLambda")
   }
   
-  
-  if(model == "mod_b"){
-    samples <- mod$sample(
-      data = list(
-        T = prep_dat_list$cap_T,
-        D = prep_dat_list$maxDelay,
-        r = prep_dat_list$rT,
-        lead_ind = ts$lead_ind_icu,
-        k_wd_haz = dim(aperm(prep_dat_list$W_wd, c(2, 1, 3)))[3],
-        W_wd = aperm(prep_dat_list$W_wd, c(2, 1, 3)),
-        Z = prep_dat_list$Z,
-        alpha = rep(1, prep_dat_list$maxDelay +1)
-      ),
-      seed = 1142,
-      adapt_delta = 0.9,
-      chains = 4,
-      parallel_chains = 4
-    )
-    save_res <- c("N", "p", "beta_0", "beta_1", "logLambda")
-  }
-  
-  if(model %in% c("mod_b_cp", "mod_b_ph", "mod_l")){
+  if(model == "mod_l"){
     samples <- mod$sample(
       data = list(
         T = prep_dat_list$cap_T,
@@ -269,28 +248,7 @@ evaluate_nowcast <- function(model, now, max_delay = 35) {
     save_res <- c("N", "p", "beta_0", "beta_1", "logLambda")
   }
   
-  if(model == "mod_c"){
-    samples <- mod$sample(
-      data = list(
-        T = prep_dat_list$cap_T,
-        D = prep_dat_list$maxDelay,
-        r = prep_dat_list$rT,
-        lead_ind_1 = ts$lead_ind_icu,
-        lead_ind_2 = ts$lead_ind_cases,
-        adapt_delta = 0.9,
-        k_wd_haz = dim(aperm(prep_dat_list$W_wd, c(2, 1, 3)))[3],
-        W_wd = aperm(prep_dat_list$W_wd, c(2, 1, 3)),
-        Z = prep_dat_list$Z,
-        alpha = rep(1, prep_dat_list$maxDelay + 1)
-      ),
-      seed = 1142,
-      chains = 4,
-      parallel_chains = 4
-    )
-    save_res <- c("N", "p", "beta_0", "beta_1", "beta_2", "logLambda")
-  }
-  
-  if(model == "mod_c_ph"){
+  if(model == "mod_l_2"){
     samples <- mod$sample(
       data = list(
         T = prep_dat_list$cap_T,
@@ -339,13 +297,13 @@ evaluate_nowcast <- function(model, now, max_delay = 35) {
         T = prep_dat_list$cap_T,
         D = prep_dat_list$maxDelay,
         r = prep_dat_list$rT,
-        lead_ind = ts$lead_ind_icu_d_rel,
+        lead_ind = ts$lead_ind_icu_rl,
         k_wd_haz = dim(aperm(prep_dat_list$W_wd_cp, c(2, 1, 3)))[3],
         W_wd = aperm(prep_dat_list$W_wd_cp, c(2, 1, 3)),
         Z = prep_dat_list$Z,
         alpha = rep(1, prep_dat_list$maxDelay + 1)
       ),
-      seed = 4142,
+      seed = 2142,
       chains = 4,
       parallel_chains = 4,
       adapt_delta = 0.99,
@@ -377,7 +335,7 @@ evaluate_nowcast <- function(model, now, max_delay = 35) {
     save_res <- c("N", "p", "beta_1","logLambda")
   }
   
-  if(model %in% c("mod_e", "mod_e_ph")){
+  if(model %in% c("mod_rl_2", "mod_e", "mod_e_ph")){
     samples <- mod$sample(
       data = list(
         T = prep_dat_list$cap_T,
@@ -397,35 +355,12 @@ evaluate_nowcast <- function(model, now, max_delay = 35) {
       max_treedepth = 15
     )
     warn <- names(warnings()) 
-    save_res <- c("N", "p", "beta_0", "beta_1", "beta_2", "logLambda")
-  }
-  
-  
-  if(model %in% c("mod_f", "mod_f_ph")){
-    samples <- mod$sample(
-      data = list(
-        T = prep_dat_list$cap_T,
-        D = prep_dat_list$maxDelay,
-        r = prep_dat_list$rT,
-        lead_ind = ts$lead_ind_icu_f,
-        k_wd_haz = dim(aperm(prep_dat_list$W_wd_cp, c(2, 1, 3)))[3],
-        W_wd = aperm(prep_dat_list$W_wd_cp, c(2, 1, 3)),
-        Z = prep_dat_list$Z,
-        alpha = rep(1, prep_dat_list$maxDelay + 1)),
-      seed = 1142,
-      chains = 4,
-      parallel_chains = 4,
-      adapt_delta = 0.97,
-      max_treedepth = 15
-    )
-    warn <- names(warnings()) 
-    save_res <- c("N", "p", "beta_1", "logLambda")
+    save_res <- c("N", "p", "beta_1", "beta_2", "logLambda")
   }
   
   end_time <- Sys.time()
   
   # Save warnings and results
-  
   samples$cmdstan_diagnose() %>% 
     as.data.frame() %>% 
     write_csv(paste0("../results/warnings/", model, "_", now, ".csv"))
@@ -458,7 +393,7 @@ rep_dates <- list.files(path = paste0("../data/FoHM/")) %>%
 
 for(i in 60:60){
   date <- now <- rep_dates[i]
-  model_spec <- model <- "mod_rl"
+  model_spec <- model <- "mod_l_2"
   lapply(model_spec , evaluate_nowcast, date)
 }
 

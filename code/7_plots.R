@@ -4,29 +4,23 @@ library(tidyverse)
 library(data.table)
 library(lubridate)
 library(readxl)
-library(wesanderson)
 library(ggpubr)
 library(zoo)
 library(scales)
 library(ggsci)
 library(extrafont)
 library(patchwork)
+library(viridis)
 loadfonts(device = "win")
-
-setwd("/media/fabe4028/suhome/Documents/GitHub/nowcasting_covid19/code")
 
 # Import COVID data and Nowcast results
 dat <- read_csv("../data/covid_deaths.csv")
-# res_df <- read_csv("../results/results_20220421.csv") %>% filter(date >= "2020-10-20", date <="2021-05-21")
 res_df <- read_csv("../results/results_20220419.csv") %>% filter(date >= "2020-10-20", date <= "2021-05-21")
-
-# dat %>% filter(death_date >= "2020-10-20", death_date <="2021-05-21") %>% #nrow()
-# mutate(delay = rep_date -death_date) %>% filter(delay > 35) %>% nrow()
 
 # Plot theme and color
 theme_set(theme_bw())
-# wes_cols <- c(wes_palette("Darjeeling1", 5), wes_palette("GrandBudapest2"),wes_palette("Cavalcanti1"))
 cols <- pal_nejm("default", alpha = 1)(8)
+vir_cols <- viridis_pal()(12)
 
 # Figure 1, observed and unreported.
 now <- "2022-02-01"
@@ -179,9 +173,12 @@ start <- ymd(now - 7 * 8 + 1)
 dat_mod <- dat %>%
   filter(rep_date <= now)
 
-N_a <- lapply(paste0("../results/N/", "N_mod_a_ph_2020-12-30.csv"), read_csv) %>% as.data.frame()
-N_b <- lapply(paste0("../results/N/", "N_mod_b_cp_2020-12-30.csv"), read_csv) %>% as.data.frame()
-N_d <- lapply(paste0("../results/N/", "N_mod_d_new2_2020-12-30.csv"), read_csv) %>% as.data.frame()
+#N_a <- lapply(paste0("../results/N/", "N_mod_a_ph_2020-12-30.csv"), read_csv) %>% as.data.frame()
+N_a <- lapply(paste0("../results/N/", "N_mod_r_2020-12-30.csv"), read_csv) %>% as.data.frame()
+#N_b <- lapply(paste0("../results/N/", "N_mod_b_cp_2020-12-30.csv"), read_csv) %>% as.data.frame()
+N_b <- lapply(paste0("../results/N/", "N_mod_l_2020-12-30.csv"), read_csv) %>% as.data.frame()
+#N_d <- lapply(paste0("../results/N/", "N_mod_d_new2_2020-12-30.csv"), read_csv) %>% as.data.frame()
+N_d <- lapply(paste0("../results/N/", "N_mod_rl_2_2020-12-30.csv"), read_csv) %>% as.data.frame()
 
 post_N_a <- tibble(
   date = seq(now - (55), now, "1 day"),
@@ -1250,7 +1247,7 @@ plot_dat <- dat %>%
     Reported = factor(Reported, levels= c("n_obs", "unrep"), ordered = T),
     death_date = as.POSIXct(death_date)
   ) %>% 
-  filter(death_date >= start, death_date <= now, delay <= D)
+  filter(death_date >= start, death_date <= now +1, delay <= D)
 rev_date <- c_trans("reverse", "time")
 
 p1 <- plot_dat %>% ggplot(aes(x = as.numeric(delay), y = death_date)) +
@@ -1259,23 +1256,28 @@ p1 <- plot_dat %>% ggplot(aes(x = as.numeric(delay), y = death_date)) +
   ylab("Date") +
   geom_tile(aes(fill = Reported)) +
   theme(
-    axis.ticks = element_blank(),
-    axis.line = element_blank(),
-    panel.border = element_blank(),
+    #axis.ticks = element_blank(),
+    #axis.line = element_blank(),
+    #panel.border = element_blank(),
     panel.grid.major = element_line(color = "#eeeeee")
   ) +
-  geom_text(aes(label = n_true_retro)) +
+  geom_text(aes(label = n_true_retro),size = 1.5) +
+  coord_cartesian(xlim = c(1, 34)) +
   scale_y_continuous(trans = rev_date, 
                      breaks = as.POSIXct(c("2020-11-25", "2020-12-02", "2020-12-09",
-                                           "2020-12-16","2020-12-23","2020-12-30")))+
-  scale_fill_manual(values = c(n_obs="green",unrep = "red" ),
-                    labels = c("Reported", "Occurred but not yet reported"))
-  #+
-  #theme(legend.background = element_blank(),
-   #     legend.title = element_blank(),
-    #    legend.position = "none"
-#  )
+                                           "2020-12-16","2020-12-23","2020-12-30")),
+                     labels = c("20-11-25", "20-12-02", "20-12-09",
+                                "20-12-16","20-12-23","20-12-30"),
+                     expand = c(0.02, 0.02))+
+  scale_fill_manual(values = c(n_obs = "#51C56AFF", unrep = "#FDE725FF"),
+                    labels = c("Reported", "Occurred but not yet reported")) +
+  theme(
+    legend.position = "none",
+    text = element_text(size = 8, family = "TT Arial")
+  ) 
+
 dat_mod <- dat %>% filter(rep_date <= now)
+
 p2 <- dat %>% group_by(date=death_date) %>%
   summarise(n_true_retro=n()) %>%
   left_join(dat_mod %>% group_by(date=death_date) %>%
@@ -1290,20 +1292,24 @@ p2 <- dat %>% group_by(date=death_date) %>%
   xlab("Date") +
   ylab("Deaths") +
   scale_x_date(breaks = as.Date(c("2020-11-25", "2020-12-02", "2020-12-09",
-                                  "2020-12-16","2020-12-23","2020-12-30")), date_labels = "%y-%m-%d")+
-  scale_fill_manual(values = c(n_obs="green",unrep = "red" ),
+                                  "2020-12-16","2020-12-23","2020-12-30")), 
+               date_labels = "%y-%m-%d",
+               expand = c(0.02, 0.02))+
+  scale_fill_manual(values = c(n_obs="#51C56AFF",unrep = "#FDE725FF" ),
                     labels = c("Reported", "Occurred but not yet reported"))+
-  theme(legend.background = element_blank(),
-        legend.title = element_blank(),
-        legend.position = "bottom"
-  )
-
-p1 + p2 + plot_annotation(tag_levels = c("A", "B")) +
-  plot_layout(guides = "collect", ncol = 3) & theme(
+  theme(
     legend.position = "bottom",
-    plot.margin = margin(0.1, 0.1, 0.1, 0.1, "cm"),
+    legend.background = element_blank(),
+    legend.title = element_blank(),
+    plot.margin = margin(0, 0, 0, 0, "cm"),
     text = element_text(size = 8, family = "TT Arial"),
-    legend.box.margin = margin(-15, -15, -15, -15))
+    legend.box.margin = margin(-10, -10, -10, -10)
+  ) 
+
+swe_rep <- p1 + p2 + plot_annotation(tag_levels = c("A", "B")) + plot_layout( ncol =1) 
+  
+ggsave(paste0("../plots/figS5.png"), units = "in", dpi = 300, swe_rep, height = 5, width = 5.2)
+ggsave(paste0("../plots/figS5.tiff"), units = "in", dpi = 300, swe_rep, height = 4, width = 5.2, compression = "lzw")
 
 # Table
 err_delay %>% # select(delay, err_a_7, err_d_7, err_b_7) %>%

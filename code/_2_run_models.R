@@ -8,18 +8,18 @@ library(readxl)
 library(zoo)
 library(abind)
 library(splitstackshape)
-setwd("~/Documents/GitHub/nowcasting_covid19/code")
+
 # Import data
-dat <- read_csv("../data/covid_deaths.csv")
+dat <- read_csv("./data/covid_deaths.csv")
 
 evaluate_nowcast <- function(model, now, max_delay = 35) {
   start_time <- Sys.time()
   
-  FHM_ICU <- read_excel(paste0("../data/FoHM/Folkhalsomyndigheten_Covid19_", now, ".xlsx"),
+  FHM_ICU <- read_excel(paste0("./data/FoHM/Folkhalsomyndigheten_Covid19_", now, ".xlsx"),
                         sheet = "Antal intensivvårdade per dag"
   )
   
-  FHM_cases <- read_excel(paste0("../data/FoHM/Folkhalsomyndigheten_Covid19_", now, ".xlsx"),
+  FHM_cases <- read_excel(paste0("./data/FoHM/Folkhalsomyndigheten_Covid19_", now, ".xlsx"),
                           sheet = "Antal per dag region"
   ) %>% select(Statistikdatum, Totalt_antal_fall)
   
@@ -187,9 +187,9 @@ evaluate_nowcast <- function(model, now, max_delay = 35) {
     D = D_max # maximum delay
   )
   
-  mod <- cmdstanr::cmdstan_model(paste0("./stan_models/", model, ".stan"))
+  mod <- cmdstanr::cmdstan_model(paste0("./code/stan_models/", model, ".stan"))
   
-  if(model == "mod_r"){
+  if(model %in% c("mod_r", "mod_r2")){
     samples <- mod$sample(
       data = list(
         T = prep_dat_list$cap_T,
@@ -203,7 +203,8 @@ evaluate_nowcast <- function(model, now, max_delay = 35) {
       seed = 1142,
       chains = 4,
       adapt_delta = 0.98,
-      parallel_chains = 4
+      parallel_chains = 4,
+      max_treedepth = 15
     )
     save_res <- c("N", "p", "logLambda")
   }
@@ -254,17 +255,18 @@ evaluate_nowcast <- function(model, now, max_delay = 35) {
         T = prep_dat_list$cap_T,
         D = prep_dat_list$maxDelay,
         r = prep_dat_list$rT,
-        lead_ind_1 = ts$mean_7_i_lag,
-        lead_ind_2 = ts$mean_7_c_lag,
+        lead_ind_1 = ts$lead_ind_icu,
+        lead_ind_2 = ts$lead_ind_cases_mod_l,
         k_wd_haz = dim(aperm(prep_dat_list$W_wd_cp, c(2, 1, 3)))[3],
         W_wd = aperm(prep_dat_list$W_wd_cp, c(2, 1, 3)),
         Z = prep_dat_list$Z,
-        adapt_delta = 0.95,
+        adapt_delta = 0.99,
         alpha = rep(1, prep_dat_list$maxDelay + 1)
       ),
-      seed = 1142,
+      seed = 4142,
       chains = 4,
-      parallel_chains = 4
+      parallel_chains = 4,
+      max_treedepth = 15
     )
     save_res <- c("N", "p", "beta_0", "beta_1", "beta_2", "logLambda")
   }
@@ -363,12 +365,12 @@ evaluate_nowcast <- function(model, now, max_delay = 35) {
   # Save warnings and results
   samples$cmdstan_diagnose() %>% 
     as.data.frame() %>% 
-    write_csv(paste0("../results/warnings/", model, "_", now, ".csv"))
+    write_csv(paste0("./results/warnings/", model, "_", now, ".csv"))
   
   samples$summary(c("phi", "sigma", save_res)) %>%
     as.data.frame() %>%  
-    mutate(run_time = end_time-start_time) %>% 
-    write_csv(paste0("../results/summary/", model, "_", now, ".csv"))
+    mutate(run_time = difftime(end_time, start_time, units='mins')) %>% 
+    write_csv(paste0("./results/summary/", model, "_", now, ".csv"))
   
   for (j in 1:length(save_res)) {
     samples$draws(save_res[j]) %>%
@@ -378,12 +380,12 @@ evaluate_nowcast <- function(model, now, max_delay = 35) {
       pivot_wider(names_from = key, values_from = value, values_fn = list) %>%
       flatten() %>%
       as.data.frame() %>%
-      write_csv(file = paste0("../results/", save_res[j], "/", save_res[j], "_", model, "_", now, ".csv"))
+      write_csv(file = paste0("./results/", save_res[j], "/", save_res[j], "_", model, "_", now, ".csv"))
   }
 }
 
 # Restrict dataset to a specific nowcast date
-rep_dates <- list.files(path = paste0("../data/FoHM/")) %>% 
+rep_dates <- list.files(path = paste0("./data/FoHM/")) %>% 
   str_extract("\\d+-\\d+-\\d+") %>%  
   as.data.frame %>% 
   distinct() %>% 

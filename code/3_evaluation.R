@@ -381,7 +381,7 @@ err_df <- N_a_df %>% filter(delay == max_delay) %>% select(date, med_a,q5_a,q95_
          crps_e_7 = apply(crps_e_7, 1, mean)
     )
 
-write_csv(err_df, "../results/results_20220421.csv")
+write_csv(err_df, "../results/results_20220419.csv")
 
 rep_dates<-rep_dates[21:137]
 rep_dates <- as.Date(rep_dates)
@@ -483,12 +483,4 @@ for(i in 1:length(N_mod_a)){
 }
 
 bind_cols(lapply(c(err_a_117, err_b_117, err_d_117), mean, 2))
-
-plot(0:35, apply(err_a_117, 2, mean))
-
-plot(0:35, apply(crps_a_117[1:117,], 2, mean))
-plot(0:35, apply(crps_a_117[1:117,], 2, mean))
-plot(0:35, apply(crps_d_117[1:117,], 2, mean))
-
-plot(0:35, apply(log_a_117[1:50,], 2, median))
 

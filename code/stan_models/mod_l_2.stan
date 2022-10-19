@@ -52,10 +52,10 @@ transformed parameters {
    p_bl_pr_rev[i] = p_bl_pr[D + 2 - i];
  }
   
-  gamma = logit(p_bl_pr[1:D] ./ (sort_desc(cumulative_sum(p_bl_pr_rev))[1: D]));
+  gamma = logit(p_bl_pr[1:D] ./ (sort_desc(cumulative_sum(p_bl_pr_rev))[1:D]));
   
   for (d in 1:(D)){
-    h[, d] = inv_logit(gamma[d] + W_wd[d]*beta_wd_haz) .* (rep_vector(1, T) - Z[, d]);
+    h[, d] = inv_logit(gamma[d] + W_wd[d] * beta_wd_haz) .* (rep_vector(1, T) - Z[, d]);
     if (d==1) {
         p[, d] = h[, d];
       } else {      
@@ -87,6 +87,7 @@ model {
   // Log-Lambda
   beta_0 ~ normal(0,0.2);
   beta_1 ~ normal(0,0.5);
+  beta_2 ~ normal(0,0.5);
   epsilon ~ std_normal();
   
   // Model for observed counts

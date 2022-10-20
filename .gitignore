@@ -1,3 +1,7 @@
 /results/*
+/webpage/*
+/code_org/*
+/code/general/
 *.csv
+*.Rproj
 .Rproj.user

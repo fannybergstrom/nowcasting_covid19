@@ -12,15 +12,14 @@ library(bayesplot)
 library(scoringRules)
 library(wesanderson)
 theme_set(theme_bw())
-setwd("/media/fabe4028/suhome/Documents/GitHub/nowcasting_covid19/code")
 wes_cols <- wes_palette("Darjeeling1", 5)
 colors <- c("Lead signal (ICU)" = wes_cols[4], "Random walk" = wes_cols[5], "RW + Lead signal (ICU)" = wes_cols[2] , "True number" = wes_cols[1])
 
 # Import data
-dat <- read_csv("../data/covid_deaths.csv")
+dat <- read_csv("./data/covid_deaths.csv")
 
 # Restrict dataset to a specific nowcast date
-rep_dates <- list.files(path = paste0("../data/FoHM/")) %>% 
+rep_dates <- list.files(path = paste0("./data/FoHM/")) %>% 
   str_extract("\\d+-\\d+-\\d+") %>%  
   as.data.frame %>% 
   filter(. >= "2020-09-15") %>%
@@ -35,7 +34,7 @@ retro_truth <- dat %>% group_by(date=death_date) %>%
   summarise(n_true_retro=n())
 
 list_files <- function(parameter, mod){
-  files <- list.files(path = paste0("../results/", parameter))
+  files <- list.files(path = paste0("./results/", parameter))
   files[str_detect(files, mod)]
 }
 
@@ -55,13 +54,13 @@ files_mod_b <- files_mod_b[21:137]
 files_mod_d <- files_mod_d[21:137]
 
 # Read files
-N_mod_a <- lapply(paste0("../results/N/", files_mod_a), read_csv)
-N_mod_b <- lapply(paste0("../results/N/", files_mod_b), read_csv)
-N_mod_b_c <- lapply(paste0("../results/N/", files_mod_b_c), read_csv)
-N_mod_c <- lapply(paste0("../results/N/", files_mod_c), read_csv)
-N_mod_d <- lapply(paste0("../results/N/", files_mod_d), read_csv)
-N_mod_d_c <- lapply(paste0("../results/N/", files_mod_d_c), read_csv)
-N_mod_e <- lapply(paste0("../results/N/", files_mod_e), read_csv)
+N_mod_a <- lapply(paste0("./results/N/", files_mod_a), read_csv)
+N_mod_b <- lapply(paste0("./results/N/", files_mod_b), read_csv)
+N_mod_b_c <- lapply(paste0("./results/N/", files_mod_b_c), read_csv)
+N_mod_c <- lapply(paste0("./results/N/", files_mod_c), read_csv)
+N_mod_d <- lapply(paste0("./results/N/", files_mod_d), read_csv)
+N_mod_d_c <- lapply(paste0("./results/N/", files_mod_d_c), read_csv)
+N_mod_e <- lapply(paste0("./results/N/", files_mod_e), read_csv)
 
 # Create results table
 N_a_df <- c()
@@ -381,7 +380,7 @@ err_df <- N_a_df %>% filter(delay == max_delay) %>% select(date, med_a,q5_a,q95_
          crps_e_7 = apply(crps_e_7, 1, mean)
     )
 
-write_csv(err_df, "../results/results_20220419.csv")
+write_csv(err_df, "./results/results_20220421.csv")
 
 rep_dates<-rep_dates[21:137]
 rep_dates <- as.Date(rep_dates)
@@ -438,17 +437,6 @@ for(i in 1:length(N_mod_d)){
   }
 }
 
-plot(0:35, apply(crps_a_all[1:117,21:56], 2, median))
-plot(0:35, apply(crps_a_all[c(1:40),21:56], 2, median))
-
-plot(0:35, apply(crps_d_all[1:117,21:56], 2, median))
-plot(0:35, apply(crps_d_all[1:80,21:56], 2, median))
-
-apply(crps_d_all[1:117,49:56], 2, mean) %>% mean()
-
-apply(crps_a_all[1:117,1:7], 2, mean) %>% mean()
-apply(crps_d_all[1:117,1:7], 2, mean) %>% mean()
-
 err_b_117 <- log_b_117 <- crps_b_117 <- matrix(NA, length(N_mod_b), 36)
 for(i in 1:length(N_mod_a)){
   for(j in 1:36){
@@ -483,4 +471,82 @@ for(i in 1:length(N_mod_a)){
 }
 
 bind_cols(lapply(c(err_a_117, err_b_117, err_d_117), mean, 2))
+
+# PI
+
+#### PI
+pi_a_95 <- c()
+rep <- rep_dates[21:137]
+l <- 117 # nrow(res_df)
+for(i in 1:l){
+  v1 <- N_mod_a[[i]][,56] %>% unlist()
+  n <- retro_truth %>% filter(date == rep[i]) %>% select(n_true_retro) %>% unlist()
+  pi_a_95[i] <-between(n, quantile(v1, .025), quantile(v1, .975))
+}
+sum(na.omit(pi_a_95))/l
+
+pi_a_90 <- c()
+for(i in 1:l){
+  v1 <- N_mod_a[[i]][,56] %>% unlist()
+  n <- retro_truth %>% filter(date == rep[i]) %>% select(n_true_retro) %>% unlist()
+  pi_a_90[i] <-between(n, quantile(v1, .05), quantile(v1, .95))
+}
+sum(na.omit(pi_a_90))/l
+
+pi_a_75 <- c()
+for(i in 1:l){
+  v1 <- N_mod_a[[i]][,56] %>% unlist()
+  n <- retro_truth %>% filter(date == rep[i]) %>% select(n_true_retro) %>% unlist()
+  pi_a_75[i] <-between(n, quantile(v1, .125), quantile(v1, .875))
+}
+sum(na.omit(pi_a_75))/l
+
+
+pi_b_95 <- c()
+for(i in 1:l){
+  v1 <- N_mod_b[[i]][,56] %>% unlist()
+  n <- retro_truth %>% filter(date == rep[i]) %>% select(n_true_retro) %>% unlist()
+  pi_b_95[i] <-between(n, quantile(v1, .025), quantile(v1, .975))
+}
+sum(na.omit(pi_b_95))/l
+
+pi_b_90 <- c()
+for(i in 1:l){
+  v1 <- N_mod_b[[i]][,56] %>% unlist()
+  n <- retro_truth %>% filter(date == rep[i]) %>% select(n_true_retro) %>% unlist()
+  pi_b_90[i] <-between(n, quantile(v1, .05), quantile(v1, .95))
+}
+sum(na.omit(pi_b_90))/l
+
+pi_b_75 <- c()
+for(i in 1:l){
+  v1 <- N_mod_b[[i]][,56] %>% unlist()
+  n <- retro_truth %>% filter(date == rep[i]) %>% select(n_true_retro) %>% unlist()
+  pi_b_75[i] <-between(n, quantile(v1, .125), quantile(v1, .875))
+}
+sum(na.omit(pi_b_75))/l
+
+pi_b_75 <- pi_b_90 <- pi_b_95 <- c()
+for(i in 1:l){
+  v1 <- N_mod_b[[i]][,56] %>% unlist()
+  n <- retro_truth %>% filter(date == rep[i]) %>% select(n_true_retro) %>% unlist()
+  pi_b_75[i] <-between(n, quantile(v1, .125), quantile(v1, .875))
+  pi_b_90[i] <-between(n, quantile(v1, .05), quantile(v1, .95))
+  pi_b_95[i] <-between(n, quantile(v1, .025), quantile(v1, .975))
+}
+sum(na.omit(pi_b_95))/l
+sum(na.omit(pi_b_90))/l
+sum(na.omit(pi_b_75))/l
+
+pi_d_75 <- pi_d_90 <- pi_d_95 <- c()
+for(i in 1:l){
+  v1 <- N_mod_d[[i]][,56] %>% unlist()
+  n <- retro_truth %>% filter(date == rep[i]) %>% select(n_true_retro) %>% unlist()
+  pi_d_75[i] <-between(n, quantile(v1, .125), quantile(v1, .875))
+  pi_d_90[i] <-between(n, quantile(v1, .05), quantile(v1, .95))
+  pi_d_95[i] <-between(n, quantile(v1, .025), quantile(v1, .975))
+}
+sum(na.omit(pi_d_95))/l
+sum(na.omit(pi_d_90))/l
+sum(na.omit(pi_d_75))/l
 

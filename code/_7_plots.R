@@ -1355,10 +1355,11 @@ crps_7 <- matrix(NA, length(N_list), 7)
 pi_95 <- matrix(NA, length(N_list), 7)
 pi_90 <- matrix(NA, length(N_list), 7)
 pi_75 <- matrix(NA, length(N_list), 7)
+t <- matrix(NA, length(N_list), 7)
 
 for(i in 1:length(N_list)){
   for(j in 1:7){
-    v <- N_list[[i]][,56+1-j] %>% unlist()
+    v <- N_list[[i]][2001:4000,(56+1-j)] %>% unlist()
     truth <- retro_truth %>% filter(date == (as.Date("2020-12-30")-j+1)) %>% select(n_true_retro) %>% unlist()
     err_7[i,j] <- abs(median(v)-truth)
     log_7[i,j] <- logs(y = v, family = "negative-binomial", mu = truth, size = 1) %>% mean()
@@ -1366,21 +1367,26 @@ for(i in 1:length(N_list)){
     pi_95[i,j] <-between(truth, quantile(v, .025), quantile(v, .975))
     pi_90[i,j] <-between(truth, quantile(v, .05), quantile(v, .95))
     pi_75[i,j] <-between(truth, quantile(v, .125), quantile(v, .875))
+    t[i,j] <- truth
   }
 }
 
 #
 
 # Collecting results
-df <- bind_cols(model = files_summary %>% str_remove(".csv"), 
+d <- bind_cols(model = files_summary %>% str_remove(".csv"), 
                 crps_7 = crps_7 %>% apply(1, mean),
                 logs_7 = log_7 %>% apply(1, mean),
                 mse_7 = err_7 %>% apply(1, mean),
                 PI_95 = pi_95 %>% apply(1, mean), 
-                PI_90 = pi_95 %>% apply(1, mean), 
-                PI_75 = pi_95 %>% apply(1, mean), 
+                PI_90 = pi_90 %>% apply(1, mean), 
+                PI_75 = pi_75 %>% apply(1, mean), 
                 running_times =times * 60) %>% as.data.frame() %>% 
-  arrange(crps_7)
+  arrange(crps_7) %>% view
 
-df
+bind_rows(d[3,] ,
+d[2,],
+d[6,] ,
+d[1,] ,
+d[5,] )
 

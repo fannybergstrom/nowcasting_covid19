@@ -1,25 +1,23 @@
+# This code is for running the nowcasting models
+
 # Load packages
-library(tidyverse)
-library(data.table)
-library(lubridate)
-library(cmdstanr)
-library(posterior)
-library(readxl)
-library(zoo)
-library(abind)
-library(splitstackshape)
+pacman::p_load(
+  tidyverse, data.table, lubridate, readxl, readr, zoo, splitstackshape, cmdstanr,
+  posterior, abind)
 
-# Import data
-dat <- read_csv("./data/covid_deaths.csv")
 
-evaluate_nowcast <- function(model, now, max_delay = 35) {
+
+# 
+evaluate_nowcast <- function(df, model, now, max_delay = 35) {
+  
+  #Start running time
   start_time <- Sys.time()
   
-  FHM_ICU <- read_excel(paste0("./data/FoHM/Folkhalsomyndigheten_Covid19_", now, ".xlsx"),
+  FHM_ICU <- read_excel(paste0("./data/fohm/fohm_covid19_", now, ".xlsx"),
                         sheet = "Antal intensivvårdade per dag"
   )
   
-  FHM_cases <- read_excel(paste0("./data/FoHM/Folkhalsomyndigheten_Covid19_", now, ".xlsx"),
+  FHM_cases <- read_excel(paste0("./data/fohm/fohm_covid19_", now, ".xlsx"),
                           sheet = "Antal per dag region"
   ) %>% select(Statistikdatum, Totalt_antal_fall)
   
@@ -229,7 +227,8 @@ evaluate_nowcast <- function(model, now, max_delay = 35) {
     save_res <- c("N", "p", "beta_0", "beta_1", "logLambda")
   }
   
-  if(model == "mod_b_cases"){
+  if(model == "mod_l_cases"){
+    mod <- cmdstanr::cmdstan_model("./code/stan_models/mod_l.stan")
     samples <- mod$sample(
       data = list(
         T = prep_dat_list$cap_T,
@@ -337,7 +336,7 @@ evaluate_nowcast <- function(model, now, max_delay = 35) {
     save_res <- c("N", "p", "beta_1","logLambda")
   }
   
-  if(model %in% c("mod_rl_2", "mod_e", "mod_e_ph")){
+  if(model == "mod_rl_2"){
     samples <- mod$sample(
       data = list(
         T = prep_dat_list$cap_T,
@@ -384,8 +383,11 @@ evaluate_nowcast <- function(model, now, max_delay = 35) {
   }
 }
 
+# Import data
+dat <- read_csv("./data/covid_deaths.csv")
+
 # Restrict dataset to a specific nowcast date
-rep_dates <- list.files(path = paste0("./data/FoHM/")) %>% 
+rep_dates <- list.files(path = paste0("./data/fohm/")) %>% 
   str_extract("\\d+-\\d+-\\d+") %>%  
   as.data.frame %>% 
   distinct() %>% 
@@ -394,8 +396,8 @@ rep_dates <- list.files(path = paste0("./data/FoHM/")) %>%
   as.vector()
 
 for(i in 60:60){
-  date <- now <- rep_dates[i]
-  model_spec <- model <- "mod_l_2"
-  lapply(model_spec , evaluate_nowcast, date)
+  date <- now <- rep_dates[60]
+  model_spec <- model <- "mod_r2"
+  lapply(model_spec , evaluate_nowcast, dat, date)
 }
 

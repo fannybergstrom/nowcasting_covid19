@@ -6,4 +6,5 @@ Weekly updated nowcast estimates of COVID-19 fatalities and ICU admissions in Sw
 <p align="center">
   https://staff.math.su.se/fanny.bergstrom/covid19-nowcasting
 </p>
+
 These graphs help provide the desired situational awareness and are to be interpreted as new variants emerge.

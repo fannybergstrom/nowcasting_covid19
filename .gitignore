@@ -4,4 +4,4 @@
 /code/general/
 *.csv
 *.Rproj
-.Rproj.user
+.R*

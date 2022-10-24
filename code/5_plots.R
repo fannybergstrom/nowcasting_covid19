@@ -142,7 +142,6 @@ timeseries_plots <- ts %>%
     labels = c(mean_c = "Reported cases", mean_i = "ICU admissions", mean_d = "Fatalities")
   )
 
-
 timeseries_plots
 
 ggsave(paste0("./plots/fig2.png"), units = "in", dpi = 300, timeseries_plots, height = 3.1, width = 5.2)
@@ -427,13 +426,6 @@ q_plot_a_30 <- q_plot %>%
 
 q_plot_a_30
 
-
-ggsave(paste0("./plots/q_plot_modR.png"), q_plot_a_30,
-  width = 3.5,
-  height = 3
-)
-
-
 # Quantil plot mod L
 p_1230_b_est <- p_est_b_1230 %>%
   pivot_longer(starts_with("p")) %>%
@@ -513,12 +505,6 @@ q_plot_b_30 <- q_plot %>%
   )
 
 q_plot_b_30
-
-ggsave(paste0("./plots/q_plot_modL.png"), q_plot_b_30,
-  width = 3.5,
-  height = 3
-)
-
 
 # Quantil plot mod RL
 p_1230_d_est <- p_est_d_1230 %>%
@@ -614,7 +600,6 @@ rep_plot_a <- res_df %>%
   ggplot(aes(x = date)) +
   geom_line(aes(y = value, color = name, linetype = name)) +
   geom_ribbon(aes(date, ymin = q5_a, ymax = q95_a), fill = cols[4], alpha = .2) +
-  # geom_ribbon(aes(date, ymin=q5_d, ymax=q95_d), fill=wes_cols[5], alpha=.2) +
   ylab("Number Fatalities") +
   xlab("Date") +
   scale_x_date(date_breaks = "1 month", date_labels = "%y-%m-%d", expand = c(0.02, 0.02)) +

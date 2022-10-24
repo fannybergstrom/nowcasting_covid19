@@ -4,5 +4,5 @@ This repository contains data and code for the manuscript \textit{Flexible Bayes
 
 Weekly updated nowcast estimates of COVID-19 fatalities and ICU admissions in Sweden using our proposed method are found at 
 <p align="center">
-  https://staff.math.su.se/fanny.bergstrom/covid19-nowcasting
+  https://staff.math.su.se/fanny.bergstrom/covid19-nowcasting.
 </p>

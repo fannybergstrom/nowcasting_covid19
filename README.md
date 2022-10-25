@@ -13,9 +13,9 @@ The implementation of the different Nowcasting models are given in the folder [s
 
 The R code used for our analysis is structures as follows
 
-1. [Data](https://github.com/fannybergstrom/nowcasting_covid19/tree/main/data/fohm) preprocessing.
+1. [Data](https://github.com/fannybergstrom/nowcasting_covid19/tree/main/data/fohm) preprocessing. 
 2. Definition of functions for fitting the nowcast models to given reporting dates for each model 
    and saving the results of the post-processing of a fit.
 3. Estimation of chosen nowcast models and reporting dates.
-4. Summarize results.
+4. Summarize results of the nowcasts.
 5. Plots (incl. results of single days).

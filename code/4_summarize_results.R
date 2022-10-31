@@ -87,9 +87,6 @@ N_d_c_df <- med_and_quantiles(N_mod_d_c)
 N_e_df <- med_and_quantiles(N_mod_e)
 
 
-N_list <- N_mod_b
-i = 6
-j =
 ##### Scores
 calculate_scores <- function(N_list, m_delay = 6) {
   res_rmse <- res_crps <- res_logs <- pi_75 <- pi_90 <- pi_95 <- matrix(NA, length(N_list), (m_delay+1))
@@ -101,7 +98,7 @@ calculate_scores <- function(N_list, m_delay = 6) {
         select(n_true_retro) %>%
         unlist()
       res_rmse[i, j] <- sqrt((median(v) - truth)^2)
-      res_logs[i, j] <- logs_sample(y = truth, dat = v + rnorm(4000, 0, 0.5))
+      res_logs[i, j] <- logs_sample(y = truth, dat = v)
       res_crps[i, j] <- crps_sample(y = truth, dat = v)
       pi_75[i, j] <- between(truth, quantile(v, .125), quantile(v, .875))
       pi_90[i, j] <- between(truth, quantile(v, .05), quantile(v, .95))

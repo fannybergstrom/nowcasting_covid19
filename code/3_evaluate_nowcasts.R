@@ -18,7 +18,7 @@ rep_dates <- list.files(path = paste0("./data/fohm/")) %>%
 models <- c("mod_r", "mod_r_cases", "mod_l", "mod_l_cases", 
             "mod_l_2", "mod_rl", "mod_rl_cases", "mod_rl_2")
 
-for(i in c(100)){
+for(i in c(2:10*10)){
   now <- rep_dates[i]
   model_spec <- "mod_r"
   lapply(model_spec , evaluate_nowcast, dat = dat, now = now)

@@ -29,15 +29,17 @@ list_files <- function(parameter, mod) {
 }
 
 # List files
-n <- 116
-files_mod_a <- list_files("N", "mod_a_ph")[21:(21 + n)]
-files_mod_b <- list_files("N", "mod_b_cp")[21:(21 + n)]
-files_mod_b_c <- list_files("N", "mod_b_cases")[1:n]
-files_mod_c <- list_files("N", "mod_c_ph")[1:n]
-files_mod_d <- list_files("N", "mod_d_new2")[21:(21 + n)]
-files_mod_d_c <- list_files("N", "mod_d_new_cases")[1:n]
-files_mod_e <- list_files("N", "mod_e_ph")[1:n]
 
+
+s = 21
+n <- 116
+files_mod_a <- list_files("N", "mod_a_ph")[s:(s + n)]
+files_mod_b <- list_files("N", "mod_b_cp")[s:(s + n)]
+files_mod_b_c <- list_files("N", "mod_b_cases")[s:(s + n)]
+files_mod_c <- list_files("N", "mod_c_ph")[s:(s + n)]
+files_mod_d <- list_files("N", "mod_d_new2")[s:(s + n)]
+files_mod_d_c <- list_files("N", "mod_d_new_cases")[s:(s + n)]
+files_mod_e <- list_files("N", "mod_e_ph")[s:(s + n)]
 
 rep_dates <- files_mod_a %>%
   str_extract("\\d+-\\d+-\\d+") %>%
@@ -51,11 +53,11 @@ rep_dates <- files_mod_a %>%
 # Read files
 N_mod_a <- lapply(paste0("./results/N/", files_mod_a), read_csv)
 N_mod_b <- lapply(paste0("./results/N/", files_mod_b), read_csv)
-# N_mod_b_c <- lapply(paste0("./results/N/", files_mod_b_c), read_csv)
-# N_mod_c <- lapply(paste0("./results/N/", files_mod_c), read_csv)
+N_mod_b_c <- lapply(paste0("./results/N/", files_mod_b_c), read_csv)
+N_mod_c <- lapply(paste0("./results/N/", files_mod_c), read_csv)
 N_mod_d <- lapply(paste0("./results/N/", files_mod_d), read_csv)
-# N_mod_d_c <- lapply(paste0("./results/N/", files_mod_d_c), read_csv)
-# N_mod_e <- lapply(paste0("./results/N/", files_mod_e), read_csv)
+N_mod_d_c <- lapply(paste0("./results/N/", files_mod_d_c), read_csv)
+N_mod_e <- lapply(paste0("./results/N/", files_mod_e), read_csv)
 
 # Function for creating results table
 med_and_quantiles <- function(sample_list) {
@@ -78,13 +80,17 @@ med_and_quantiles <- function(sample_list) {
 
 N_a_df <- med_and_quantiles(N_mod_a)
 N_b_df <- med_and_quantiles(N_mod_b)
+N_b_c_df <- med_and_quantiles(N_mod_b_c)
+N_c_df <- med_and_quantiles(N_mod_c)
 N_d_df <- med_and_quantiles(N_mod_d)
+N_d_c_df <- med_and_quantiles(N_mod_d_c)
+N_e_df <- med_and_quantiles(N_mod_e)
 
 ##### Scores
-calculate_scores <- function(N_list, m_delay = 7) {
-  res_rmse <- res_crps <- res_logs <- pi_75 <- pi_90 <- pi_95 <- matrix(NA, length(N_list), m_delay)
+calculate_scores <- function(N_list, m_delay = 6) {
+  res_rmse <- res_crps <- res_logs <- pi_75 <- pi_90 <- pi_95 <- matrix(NA, length(N_list), (m_delay+1))
   for (i in 1:length(N_list)) {
-    for (j in 1:m_delay) {
+    for (j in 1:(m_delay+1)) {
       v <- N_list[[i]][, (56 + 1 - j)] %>% unlist()
       truth <- retro_truth %>%
         filter(date == as.Date(rep_dates[i]) - j + 1) %>%
@@ -110,7 +116,11 @@ calculate_scores <- function(N_list, m_delay = 7) {
 
 Nres_mod_a <- calculate_scores(N_mod_a)
 Nres_mod_b <- calculate_scores(N_mod_b)
+Nres_mod_b_c <- calculate_scores(N_mod_b_c)
+Nres_mod_c <- calculate_scores(N_mod_c)
 Nres_mod_d <- calculate_scores(N_mod_d)
+Nres_mod_d_c <- calculate_scores(N_mod_d_c)
+Nres_mod_e <- calculate_scores(N_mod_e)
 
 # Table 1
 tbl1 <- bind_rows(
@@ -155,45 +165,32 @@ err_df <- N_a_df %>%
   filter(delay == max_delay) %>%
   select(date, med_a = med, q5_a = q5, q95_a = q95) %>%
   full_join(N_b_df %>% filter(delay == max_delay) %>% select(date, med_b = med, q5_b = q5, q95_b = q95)) %>%
-  # full_join(N_b_c_df %>% filter(delay == max_delay) %>% select(date, med_b_c,q5_b_c,q95_b_c)) %>%
-  # full_join(N_c_df %>% filter(delay == max_delay) %>% select(date, med_c,q5_c,q95_c)) %>%
+  full_join(N_b_c_df %>% filter(delay == max_delay) %>% select(date, med_b_c = med, q5_b_c = q5, q95_b_c = q95)) %>%
+  full_join(N_c_df %>% filter(delay == max_delay) %>% select(date, med_c = med, q5_c = q5, q95_c = q95)) %>%
   full_join(N_d_df %>% filter(delay == max_delay) %>% select(date, med_d = med, q5_d = q5, q95_d = q95)) %>%
-  # left_join(N_d_c_df %>% filter(delay == max_delay) %>% select(date, med_d_c,q5_d_c,q95_d_c)) %>%
-  # full_join(N_e_df %>% filter(delay == max_delay) %>% select(date, med_e,q5_e,q95_e)) %>%
+  left_join(N_d_c_df %>% filter(delay == max_delay) %>% select(date, med_d_c = med, q5_d_c = q5, q95_d_c = q95)) %>%
+  left_join(N_e_df %>% filter(delay == max_delay) %>% select(date, med_e = med, q5_e = q5, q95_e = q95)) %>%
   left_join(dat %>% group_by(date = death_date) %>%
     summarise(n_true_retro = sum(n))) %>%
   mutate(
-    err_a_7 = apply(Nres_mod_d$rmse, 1, mean),
+    err_a_7 = apply(Nres_mod_a$rmse, 1, mean),
     err_b_7 = apply(Nres_mod_b$rmse, 1, mean),
-    # err_b_c_7 = apply(err_b_c_7, 1, mean),
-    # err_c_7 = apply(err_c_7, 1, mean),
-    err_d_7 = apply(Nres_mod_a$rmse, 1, mean),
-    # err_d_c_7 = apply(err_d_c_7, 1, mean),
-    # err_e_7 = apply(err_e_7, 1, mean),
+    err_d_7 = apply(Nres_mod_d$rmse, 1, mean),
     log_a_7 = apply(Nres_mod_a$logs, 1, mean),
     log_b_7 = apply(Nres_mod_b$logs, 1, mean),
-    # log_b_c_7 = apply(log_b_c_7, 1, mean),
-    # log_c_7 = apply(log_c_7, 1, mean),
     log_d_7 = apply(Nres_mod_d$logs, 1, mean),
-    # log_d_c_7 = apply(log_d_c_7, 1, mean),
-    # log_e_7 = apply(log_e_7, 1, mean),
     crps_a_7 = apply(Nres_mod_a$crps, 1, mean),
     crps_b_7 = apply(Nres_mod_b$crps, 1, mean),
-    # crps_b_c = crps_b_c,
-    # crps_b_c_7 = apply(crps_b_c_7, 1, mean),
-    # crps_c_7 = apply(crps_c_7, 1, mean),
-    crps_d_7 = apply(Nres_mod_d$crps, 1, mean) # ,
-    # crps_d_c_7 = apply(crps_d_c_7, 1, mean),
-    # crps_e_7 = apply(crps_e_7, 1, mean)
+    crps_d_7 = apply(Nres_mod_d$crps, 1, mean)
   )
 
-write_csv(err_df, "./results/results_20221027.csv")
+write_csv(err_df, "./results/results.csv")
 
 
 # Decreasing score
-mod_a_all <- calculate_scores(N_mod_a, 36)
-mod_b_all <- calculate_scores(N_mod_b, 36)
-mod_d_all <- calculate_scores(N_mod_d, 36)
+mod_a_all <- calculate_scores(N_mod_a, 35)
+mod_b_all <- calculate_scores(N_mod_b, 35)
+mod_d_all <- calculate_scores(N_mod_d, 35)
 
 err_by_delay_df <- tibble(
   delay = 0:35,
@@ -208,10 +205,10 @@ err_by_delay_df <- tibble(
   rmse_d = mod_d_all$rmse %>% apply(2, mean)
 )
 
-write_csv(err_by_delay_df, "./results/error_by_delay_20221028.csv")
+write_csv(err_by_delay_df, "./results/error_by_delay.csv")
 
 # Beta_0 for mod l
-files_mod_b <- list_files("beta_0", "mod_b")[1:117]
+files_mod_b <- list_files("beta_0", "mod_b")
 
 # Read files
 beta_0_mod_b <- lapply(paste0("../results/beta_0/", files_mod_b), read_csv)
@@ -222,8 +219,8 @@ write_csv(beta_0_df, "../results/results_beta_0.csv")
 
 
 # Beta_1 for mod l and rl
-files_mod_b <- list_files("beta_1", "mod_b")[1:117]
-files_mod_d <- list_files("beta_1", "mod_d")[1:117]
+files_mod_b <- list_files("beta_1", "mod_b")
+files_mod_d <- list_files("beta_1", "mod_d")
 
 # Read files
 beta_1_mod_b <- lapply(paste0("../results/beta_1/", files_mod_b), read_csv)

@@ -10,7 +10,7 @@ loadfonts(device = "win")
 
 # Import COVID data and Nowcast results
 dat <- read_csv("./data/covid_deaths.csv")
-res_df <- read_csv("./results/results.csv") %>% 
+res_df <- read_csv("./results/summarized_results_and_tables/results.csv") %>% 
   filter(date >= "2020-10-20", date <= "2021-05-21")
 
 # Plot theme and color
@@ -283,7 +283,7 @@ snap_res_d <- dat_mod %>%
   pivot_longer(c(med_d, n_true_retro)) %>%
   ggplot() +
   geom_line(aes(date, value, col = name, linetype = name)) +
-  geom_ribbon(aes(date, ymin = q5_d, ymax = q95_d), fill = cols[8], alpha = .2) +
+  geom_ribbon(aes(date, ymin = q5_d, ymax = q95_d), fill = wes_cols[3], alpha = .2) +
   geom_col(aes(date, n_obs / 2)) +
   ylab("Number Fatalities") +
   xlab("Date") +
@@ -299,7 +299,7 @@ snap_res_d <- dat_mod %>%
     legend.spacing = unit(0.01, "mm")
   ) +
   scale_color_manual(
-    values = c(med_d = cols[8], n_true_retro = cols[1]),
+    values = c(med_d = wes_cols[3], n_true_retro = cols[1]),
     labels = c("RL(ICU)", "True number")
   ) +
   scale_x_date(breaks = dates, date_labels = "%y-%m-%d", expand = c(0.02, 0.02)) +
@@ -311,17 +311,16 @@ snap_res_d <- dat_mod %>%
 snap_res_d
 
 # Q-plots
-p_est_a_1230 <- read_csv("./results/p/p_mod_a_ph_2020-12-30.csv")
+p_est_a_1230 <- read_csv("./results/p/p_mod_r_ph_2020-12-30.csv")
 p_est_d_1230 <- read_csv("./results/p/p_mod_rl_2020-12-30.csv")
 p_est_b_1230 <- read_csv("./results/p/p_mod_l_2020-12-30.csv")
-dat <- read_csv("./data/covid_deaths_org.csv")
+dat <- read_csv("./data/covid_deaths.csv")
 
 p_1230_emp <- dat %>%
   mutate(delay = as.numeric(rep_date - death_date)) %>%
   filter(death_date >= "2020-11-01", death_date <= "2020-12-30") %>%
-  select(death_date, delay) %>%
   group_by(death_date, delay) %>%
-  summarise(n = n()) %>%
+  summarise(n = sum(n)) %>%
   right_join(tibble(expand.grid(
     death_date = seq(as.Date("2020-11-25"), as.Date("2020-12-30"), "1 day"),
     delay = 0:500
@@ -410,7 +409,6 @@ q_plot_a_30 <- q_plot %>%
   ) +
   scale_color_manual(
     values = c(rep(c(cols[4], cols[1]), 3)),
-    # breaks = c("q_05", "q_05_emp", "q_5_emp", "q_5_est","q_95", "q_95_emp"),
     labels = c(
       expression(paste(q[0.05] ~ R, " ")), expression(q[0.05] ~ Emp), expression(paste(q[0.50] ~ R, " ")),
       expression(q[0.50] ~ Emp), expression(paste(q[0.95] ~ R, " ")), expression(q[0.95] ~ Emp)
@@ -568,7 +566,7 @@ q_plot_d_30 <- q_plot_d %>%
     plot.margin = margin(0.1, 0.7, 0.2, 0, "cm")
   ) +
   scale_color_manual(
-    values = c(rep(c(cols[7], cols[1]), 3)),
+    values = c(rep(c(wes_cols[3], cols[1]), 3)),
     # breaks = c("q_05", "q_05_emp", "q_5_emp", "q_5_est","q_95", "q_95_emp"),
     labels = c(
       q_05 = expression(paste(q[0.05] ~ RL(ICU))), q_05_emp = expression(paste(q[0.05] ~ Emp, " ")),
@@ -595,6 +593,103 @@ ggsave(paste0("./plots/fig4.png"), units = "in", dpi = 300, fig4, height = 6.8, 
 ggsave(paste0("./plots/fig4.tiff"), units = "in", dpi = 300, fig4, height = 6.8, width = 5.2)
 
 # Fig 5
+err_delay <- read_csv("./results/summarized_results_and_tables/error_by_delay.csv") %>% as.data.frame()
+
+rmse_plot <- err_delay %>% # select(delay, err_a_7, err_d_7, err_b_7) %>%
+  pivot_longer(starts_with("rmse"), names_to = "model", values_to = "rmse") %>%
+  ggplot(aes(x = delay, y = rmse)) +
+  geom_line(aes(color = model, linetype = model)) +
+  ylab("RMSE") +
+  xlab(expression(paste("Days since day ", italic("T")))) +
+  scale_x_continuous(breaks = 0:7 * 5, expand = c(0.02, 0.02)) +
+  theme(
+    legend.background = element_blank(),
+    legend.position = "bottom",
+    legend.title = element_blank(),
+    text = element_text(size = 8, family = "TT Arial"),
+    legend.box.margin = margin(-15, -15, -15, -15),
+    plot.margin = margin(0.1, 0.1, 0.5, 0, "cm")
+  ) +
+  scale_color_manual(
+    values = c(cols[4], cols[2], wes_cols[3]),
+    labels = c(rmse_a = "R", rmse_d = "RL(ICU)", rmse_b = "L(ICU)")
+  ) +
+  scale_linetype_manual(
+    values = c(1, 3, 2),
+    labels = c(rmse_a = "R", rmse_d = "RL(ICU)", rmse_b = "L(ICU)")
+  )
+
+rmse_plot
+
+log_plot <- err_delay %>% # select(delay, err_a_7, err_d_7, err_b_7) %>%
+  pivot_longer(starts_with("log"), names_to = "model", values_to = "log") %>%
+  ggplot(aes(x = delay, y = log)) +
+  geom_line(aes(color = model, linetype = model)) +
+  ylab("logS") +
+  xlab(expression(paste("Days since day ", italic("T")))) +
+  scale_x_continuous(breaks = 0:7 * 5, expand = c(0.02, 0.02)) +
+  theme(
+    legend.background = element_blank(),
+    legend.position = "bottom",
+    legend.title = element_blank(),
+    text = element_text(size = 8, family = "TT Arial"),
+    legend.box.margin = margin(-15, -15, -15, -15),
+    plot.margin = margin(0.1, 0.1, 0.5, 0, "cm")
+  ) +
+  scale_color_manual(
+    values = c(cols[4], cols[2], wes_cols[3]),
+    labels = c(logs_a = "R", logs_d = "RL(ICU)", logs_b = "L(ICU)")
+  ) +
+  scale_linetype_manual(
+    values = c(1, 3, 2),
+    labels = c(logs_a = "R", logs_d = "RL(ICU)", logs_b = "L(ICU)")
+  )
+
+log_plot
+
+
+crps_plot <- err_delay %>% # select(delay, err_a_7, err_d_7, err_b_7) %>%
+  pivot_longer(starts_with("crps"), names_to = "model", values_to = "crps") %>%
+  ggplot(aes(x = delay, y = crps)) +
+  geom_line(aes(color = model, linetype = model)) +
+  ylab("CRPS") +
+  xlab(expression(paste("Days since day ", italic("T")))) +
+  scale_x_continuous(breaks = 0:7 * 5, expand = c(0.02, 0.02)) +
+  theme(
+    legend.background = element_blank(),
+    legend.position = "bottom",
+    legend.title = element_blank(),
+    text = element_text(size = 8, family = "TT Arial"),
+    legend.box.margin = margin(-15, -15, -15, -15),
+    plot.margin = margin(0.1, 0.1, 0.5, 0, "cm")
+  ) +
+  scale_color_manual(
+    values = c(cols[4], cols[2], wes_cols[3]),
+    labels = c(crps_a = "R", crps_d = "RL(ICU)", crps_b = "L(ICU)")
+  ) +
+  scale_linetype_manual(
+    values = c(1, 3, 2),
+    labels = c(crps_a = "R", crps_d = "RL(ICU)", crps_b = "L(ICU)")
+  )
+
+crps_plot
+
+fig5 <- crps_plot + log_plot +
+  rmse_plot +
+  plot_annotation(tag_levels = c("A", "B")) +
+  plot_layout(guides = "collect", ncol = 3) & theme(
+    legend.position = "bottom",
+    plot.margin = margin(0.1, 0.1, 0.1, 0.1, "cm"),
+    text = element_text(size = 8, family = "TT Arial"),
+    legend.box.margin = margin(-15, -15, -15, -15)
+  )
+
+fig5
+ggsave(paste0("./plots/fig5.png"), units = "in", dpi = 300, fig5, height = 2.5, width = 5.2)
+#ggsave(paste0("./plots/fig5.tiff"), units = "in", dpi = 300, figS2, height = 2.5, width = 5.2)
+
+
+# Fig 6
 rep_plot_a <- res_df %>%
   pivot_longer(c(med_a, n_true_retro)) %>%
   ggplot(aes(x = date)) +
@@ -690,7 +785,7 @@ fig6 <- rep_plot_a + rep_plot_b + rep_plot_d +
 )
 fig6
 ggsave(paste0("./plots/fig6.png"), units = "in", dpi = 300, fig6, height = 5.8, width = 5.2)
-ggsave(paste0("./plots/fig6.tiff"), units = "in", dpi = 300, fig6, height = 5.8, width = 5.2)
+#ggsave(paste0("./plots/fig6.tiff"), units = "in", dpi = 300, fig6, height = 5.8, width = 5.2)
 
 # Fig 7
 dates <- c(as.Date("2020-11-01"), as.Date("2021-01-01"), as.Date("2021-03-01"), as.Date("2021-05-01"))
@@ -727,7 +822,7 @@ log_plot_7
 
 
 crps_plot_7 <- res_df %>%
-  select(date, crps_a_7, crps_b_7, crps_d_7) %>%
+  select(date, crps_a_7, crps_b_7, crps_d_7) %>% 
   pivot_longer(starts_with("crps"), names_to = "model", values_to = "crps") %>%
   ggplot(aes(x = date, y = crps)) +
   geom_line(aes(color = model, linetype = model)) +
@@ -964,7 +1059,7 @@ ggsave(paste0("./plots/figS2.png"), units = "in", dpi = 300, figS2, height = 3.9
 
 
 # Beta 0
-res_beta_0 <- read_csv("./results/results_beta_0.csv") %>% filter(date >= "2020-10-15", date <= "2021-05-14")
+res_beta_0 <- read_csv("./results/summarized_results_and_tables/results_beta_0.csv") %>% filter(date >= "2020-10-15", date <= "2021-05-14")
 beta_0_plot <- res_beta_0 %>%
   ggplot(aes(x = date)) +
   geom_line(aes(y = med_b, color = "L(ICU)")) +
@@ -983,7 +1078,7 @@ beta_0_plot <- res_beta_0 %>%
 beta_0_plot
 
 # Beta 1
-res_beta_1 <- read_csv("./results/results_beta_1_mod_b.csv") %>% filter(date >= "2020-10-15", date <= "2021-05-14")
+res_beta_1 <- read_csv("./results/summarized_results_and_tables/results_beta_1_mod_b.csv") %>% filter(date >= "2020-10-15", date <= "2021-05-14")
 beta_1_plot <- res_beta_1 %>%
   ggplot(aes(x = date)) +
   geom_line(aes(y = med_b, color = "L(ICU)")) +
@@ -1008,7 +1103,7 @@ ggsave(paste0("./plots/figS3.tiff"), units = "in", dpi = 300, figS3, height = 3.
 
 
 
-res_beta_1_d <- read_csv("./results/results_beta_1_mod_d.csv") %>% filter(date >= "2020-10-15", date <= "2021-05-15")
+res_beta_1_d <- read_csv("./results/summarized_results_and_tables/results_beta_1_mod_d.csv") %>% filter(date >= "2020-10-15", date <= "2021-05-15")
 figS4 <- res_beta_1_d %>%
   ggplot(aes(x = date)) +
   geom_line(aes(y = med_d, color = "RL(ICU)")) +
@@ -1052,7 +1147,7 @@ rmse7_plot <- res_df %>%
     plot.margin = margin(0.1, 0.1, 0.5, 0, "cm")
   ) +
   scale_color_manual(
-    values = c(cols[4], cols[2], cols[8]),
+    values = c(cols[4], cols[2], wes_cols[3]),
     labels = c(err_a_7 = "R", err_d_7 = "RL(ICU)", err_b_7 = "L(ICU)")
   ) +
   scale_linetype_manual(
@@ -1065,101 +1160,6 @@ rmse7_plot
 ggsave(paste0("./plots/S1_fig.png"), units = "in", dpi = 300, rmse7_plot, height = 1.75, width = 5.2)
 ggsave(paste0("./plots/S1_fig.tiff"), units = "in", dpi = 300, rmse7_plot, height = 1.75, width = 5.2)
 
-# S2 Fig
-err_delay <- read_csv("./results/error_by_delay.csv") %>% as.data.frame()
-
-rmse_plot <- err_delay %>% # select(delay, err_a_7, err_d_7, err_b_7) %>%
-  pivot_longer(starts_with("rmse"), names_to = "model", values_to = "rmse") %>%
-  ggplot(aes(x = delay, y = rmse)) +
-  geom_line(aes(color = model, linetype = model)) +
-  ylab("RMSE") +
-  xlab(expression(paste("Days since day ", italic("T")))) +
-  scale_x_continuous(breaks = 0:7 * 5, expand = c(0.02, 0.02)) +
-  theme(
-    legend.background = element_blank(),
-    legend.position = "bottom",
-    legend.title = element_blank(),
-    text = element_text(size = 8, family = "TT Arial"),
-    legend.box.margin = margin(-15, -15, -15, -15),
-    plot.margin = margin(0.1, 0.1, 0.5, 0, "cm")
-  ) +
-  scale_color_manual(
-    values = c(cols[4], cols[2], cols[8]),
-    labels = c(rmse_a = "R", rmse_d = "RL(ICU)", rmse_b = "L(ICU)")
-  ) +
-  scale_linetype_manual(
-    values = c(1, 3, 2),
-    labels = c(rmse_a = "R", rmse_d = "RL(ICU)", rmse_b = "L(ICU)")
-  )
-
-rmse_plot
-
-log_plot <- err_delay %>% # select(delay, err_a_7, err_d_7, err_b_7) %>%
-  pivot_longer(starts_with("log"), names_to = "model", values_to = "log") %>%
-  ggplot(aes(x = delay, y = log)) +
-  geom_line(aes(color = model, linetype = model)) +
-  ylab("logS") +
-  xlab(expression(paste("Days since day ", italic("T")))) +
-  scale_x_continuous(breaks = 0:7 * 5, expand = c(0.02, 0.02)) +
-  theme(
-    legend.background = element_blank(),
-    legend.position = "bottom",
-    legend.title = element_blank(),
-    text = element_text(size = 8, family = "TT Arial"),
-    legend.box.margin = margin(-15, -15, -15, -15),
-    plot.margin = margin(0.1, 0.1, 0.5, 0, "cm")
-  ) +
-  scale_color_manual(
-    values = c(cols[4], cols[2], cols[8]),
-    labels = c(log_a = "R", log_d = "RL(ICU)", log_b = "L(ICU)")
-  ) +
-  scale_linetype_manual(
-    values = c(1, 3, 2),
-    labels = c(log_a = "R", log_d = "RL(ICU)", log_b = "L(ICU)")
-  )
-
-log_plot
-
-
-crps_plot <- err_delay %>% # select(delay, err_a_7, err_d_7, err_b_7) %>%
-  pivot_longer(starts_with("crps"), names_to = "model", values_to = "crps") %>%
-  ggplot(aes(x = delay, y = crps)) +
-  geom_line(aes(color = model, linetype = model)) +
-  ylab("CRPS") +
-  xlab(expression(paste("Days since day ", italic("T")))) +
-  scale_x_continuous(breaks = 0:7 * 5, expand = c(0.02, 0.02)) +
-  theme(
-    legend.background = element_blank(),
-    legend.position = "bottom",
-    legend.title = element_blank(),
-    text = element_text(size = 8, family = "TT Arial"),
-    legend.box.margin = margin(-15, -15, -15, -15),
-    plot.margin = margin(0.1, 0.1, 0.5, 0, "cm")
-  ) +
-  scale_color_manual(
-    values = c(cols[4], cols[2], cols[8]),
-    labels = c(crps_a = "R", crps_d = "RL(ICU)", crps_b = "L(ICU)")
-  ) +
-  scale_linetype_manual(
-    values = c(1, 3, 2),
-    labels = c(crps_a = "R", crps_d = "RL(ICU)", crps_b = "L(ICU)")
-  )
-
-crps_plot
-
-figS2 <- crps_plot + log_plot +
-  rmse_plot +
-  plot_annotation(tag_levels = c("A", "B")) +
-  plot_layout(guides = "collect", ncol = 3) & theme(
-  legend.position = "bottom",
-  plot.margin = margin(0.1, 0.1, 0.1, 0.1, "cm"),
-  text = element_text(size = 8, family = "TT Arial"),
-  legend.box.margin = margin(-15, -15, -15, -15)
-)
-
-figS2
-ggsave(paste0("./plots/figS2.png"), units = "in", dpi = 300, figS2, height = 2.5, width = 5.2)
-#ggsave(paste0("./plots/figS2.tiff"), units = "in", dpi = 300, figS2, height = 2.5, width = 5.2)
 
 
 # Fig S2
@@ -1248,70 +1248,5 @@ swe_rep <- p1 + p2 + plot_annotation(tag_levels = c("A", "B")) + plot_layout( nc
 ggsave(paste0("./plots/figS5.png"), units = "in", dpi = 300, swe_rep, height = 5, width = 5.2)
 ggsave(paste0("./plots/figS5.tiff"), units = "in", dpi = 300, swe_rep, height = 4, width = 5.2, compression = "lzw")
 
-# Table
-err_delay %>% # select(delay, err_a_7, err_d_7, err_b_7) %>%
-  pivot_longer(starts_with("crps"), names_to = "model", values_to = "crps") %>%
-  group_by(model) %>%
-  filter(delay %in% 0:6) %>%
-  summarise(sum(crps) / 7) %>%
-  view()
 
-err_delay %>% # select(delay, err_a_7, err_d_7, err_b_7) %>%
-  pivot_longer(starts_with("log"), names_to = "model", values_to = "log") %>%
-  group_by(model) %>%
-  filter(delay %in% 0:6) %>%
-  summarise(sum(log) / 7)
-
-err_delay %>% # select(delay, err_a_7, err_d_7, err_b_7) %>%
-  pivot_longer(starts_with("rmse"), names_to = "model", values_to = "rmse") %>%
-  group_by(model) %>%
-  filter(delay %in% 0:6) %>%
-  summarise(sum(rmse) / 7)
-
-
-# Table S2
-path_summary <- "./results/summary/"
-files_summary <- list.files(path_summary) 
-summary_list <- lapply(path_summary %>% paste0(files_summary) , read_csv)
-
-# Running times
-times <- c()
-for(l in 1:length(files_summary)){
-  times[l] <- summary_list[[l]]$run_time[1]
-}
-
-path_N <- "./results/N/n_" %>% paste0(files_summary)
-retro_truth<- dat %>%
-  group_by(date = death_date) %>%
-  summarise(n_true_retro = n())
-
-N_list <- lapply(path_N , read_csv)
-err_7 <- log_7 <- crps_7 <- pi_95 <- pi_90 <- pi_75  <- pi_75  <- t <- matrix(NA, length(N_list), 7)
-
-for(i in 1:length(N_list)){
-  for(j in 1:7){
-    v <- N_list[[i]][2001:4000,(56+1-j)] %>% unlist()
-    truth <- retro_truth %>% filter(date == (as.Date("2020-12-30")-j+1)) %>% select(n_true_retro) %>% unlist()
-    err_7[i,j] <- abs(median(v)-truth)
-    log_7[i,j] <- logs(y = v, family = "negative-binomial", mu = truth, size = 1) %>% mean()
-    crps_7[i,j] <- crps(y = v, family = "negative-binomial", mu = truth, size = 1) %>% mean() 
-    pi_95[i,j] <-between(truth, quantile(v, .025), quantile(v, .975))
-    pi_90[i,j] <-between(truth, quantile(v, .05), quantile(v, .95))
-    pi_75[i,j] <-between(truth, quantile(v, .125), quantile(v, .875))
-    t[i,j] <- truth
-  }
-}
-
-# Collecting results
-d <- bind_cols(model = files_summary %>% str_remove(".csv"), 
-                crps_7 = crps_7 %>% apply(1, mean),
-                logs_7 = log_7 %>% apply(1, mean),
-                mse_7 = err_7 %>% apply(1, mean),
-                PI_95 = pi_95 %>% apply(1, mean), 
-                PI_90 = pi_90 %>% apply(1, mean), 
-                PI_75 = pi_75 %>% apply(1, mean), 
-                running_times =times * 60) %>% as.data.frame() %>% 
-  arrange(crps_7) %>% view
-
-bind_rows(d[3,], d[2,], d[6,] , d[1,] , d[5,] )
 

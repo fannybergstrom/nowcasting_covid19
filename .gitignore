@@ -1,3 +1,5 @@
 /results/*
 *.Rproj
 .R*
+!/results/summarized_results_and_tables*
+!*placeholder*

@@ -30,7 +30,6 @@ list_files <- function(parameter, mod) {
 
 # List files
 
-
 s = 21
 n <- 116
 files_mod_a <- list_files("N", "mod_a_ph")[s:(s + n)]
@@ -50,7 +49,7 @@ rep_dates <- files_mod_a %>%
   as.vector()
 
 
-# Read files
+## Read files
 N_mod_a <- lapply(paste0("./results/N/", files_mod_a), read_csv)
 N_mod_b <- lapply(paste0("./results/N/", files_mod_b), read_csv)
 N_mod_b_c <- lapply(paste0("./results/N/", files_mod_b_c), read_csv)
@@ -59,7 +58,7 @@ N_mod_d <- lapply(paste0("./results/N/", files_mod_d), read_csv)
 N_mod_d_c <- lapply(paste0("./results/N/", files_mod_d_c), read_csv)
 N_mod_e <- lapply(paste0("./results/N/", files_mod_e), read_csv)
 
-# Function for creating results table
+## Function for creating results table
 med_and_quantiles <- function(sample_list) {
   df_med <- c()
   for (i in 1:length(sample_list)) {
@@ -88,13 +87,13 @@ N_e_df <- med_and_quantiles(N_mod_e)
 
 
 ##### Scores
-calculate_scores <- function(N_list, m_delay = 6) {
+calculate_scores <- function(N_list, m_delay = 6, rep_date = rep_dates) {
   res_rmse <- res_crps <- res_logs <- pi_75 <- pi_90 <- pi_95 <- matrix(NA, length(N_list), (m_delay+1))
   for (i in 1:length(N_list)) {
     for (j in 1:(m_delay+1)) {
       v <- N_list[[i]][, (56 + 1 - j)] %>% unlist()
       truth <- retro_truth %>%
-        filter(date == as.Date(rep_dates[i]) - j + 1) %>%
+        filter(date == as.Date(rep_date[i]) - j + 1) %>%
         select(n_true_retro) %>%
         unlist()
       res_rmse[i, j] <- sqrt((median(v) - truth)^2)
@@ -124,7 +123,7 @@ Nres_mod_d <- calculate_scores(N_mod_d)
 Nres_mod_d_c <- calculate_scores(N_mod_d_c)
 Nres_mod_e <- calculate_scores(N_mod_e)
 
-# Table 1
+## Table 1
 tbl1 <- bind_rows(
   rsme = c(
     Nres_mod_a$rmse %>% mean(),
@@ -158,10 +157,10 @@ tbl1 <- bind_rows(
   )
 )
 
-write_csv(tbl1, "./results/table1.csv")
+write_csv(tbl1, "./results/summarized_results_and_tables/table1.csv")
 
 
-# Create results table
+## Create results table
 max_delay <- 0
 err_df <- N_a_df %>%
   filter(delay == max_delay) %>%
@@ -186,10 +185,10 @@ err_df <- N_a_df %>%
     crps_d_7 = apply(Nres_mod_d$crps, 1, mean)
   )
 
-write_csv(err_df, "./results/results.csv")
+write_csv(err_df, "./results/summarized_results_and_tables/results.csv")
 
 
-# Decreasing score
+## Decreasing score
 mod_a_all <- calculate_scores(N_mod_a, 35)
 mod_b_all <- calculate_scores(N_mod_b, 35)
 mod_d_all <- calculate_scores(N_mod_d, 35)
@@ -207,9 +206,9 @@ err_by_delay_df <- tibble(
   rmse_d = mod_d_all$rmse %>% apply(2, mean)
 )
 
-write_csv(err_by_delay_df, "./results/error_by_delay.csv")
+write_csv(err_by_delay_df, "./results/summarized_results_and_tables/error_by_delay.csv")
 
-# Beta_0 for mod l
+## Beta_0 for mod l
 files_mod_b <- list_files("beta_0", "mod_b")
 
 # Read files
@@ -217,10 +216,10 @@ beta_0_mod_b <- lapply(paste0("../results/beta_0/", files_mod_b), read_csv)
 beta_0_df <- med_and_quantiles(beta_0_mod_b)
 max_delay <- 0
 beta_0_df <- beta_0_df %>% filter(delay == max_delay)
-write_csv(beta_0_df, "../results/results_beta_0.csv")
+write_csv(beta_0_df, "../results/summarized_results_and_tables/results_beta_0.csv")
 
 
-# Beta_1 for mod l and rl
+## Beta_1 for mod l and rl
 files_mod_b <- list_files("beta_1", "mod_b")
 files_mod_d <- list_files("beta_1", "mod_d")
 
@@ -232,8 +231,42 @@ beta_1_mod_d <- lapply(paste0("../results/beta_1/", files_mod_d), read_csv)
 beta_1_df <- med_and_quantiles(beta_1_mod_b)
 write_csv(
   beta_1_df %>% filter(delay == max_delay),
-  "../results/results_beta_1_mod_b.csv"
+  "../results/summarized_results_and_tables/results_beta_1_mod_b.csv"
 )
 
 beta_1_df_d <- N_d_df %>% filter(delay == max_delay)
-write_csv(beta_1_df_d, "../results/results_beta_1_mod_d.csv")
+write_csv(beta_1_df_d, "../results/summarized_results_and_tables/results_beta_1_mod_d.csv")
+
+
+
+## Table S2
+path_summary <- "./results/summary/"
+files_summary <- list.files(path_summary) 
+files_summary <- files_summary[str_detect(files_summary,"12-30")]
+summary_list <- lapply(path_summary %>% paste0(files_summary) , read_csv)
+
+# Running times
+times <- c()
+for(l in 1:length(files_summary)){
+  times[l] <- summary_list[[l]]$run_time[1]
+}
+
+path_N <- "./results/N/n_" %>% paste0(files_summary)
+path_N <- str_remove(path_N, "placeholder")
+
+N_list <- lapply(path_N , read_csv)
+
+res_tabS2 <- calculate_scores(N_list = N_list, rep_date = rep("2020-12-30", length(N_list)))
+
+# Collecting results
+tabS2 <- bind_cols(model = files_summary %>% str_remove(".csv"), 
+               crps_7 = res_tabS2$crps %>% apply(1, mean),
+               logs_7 = res_tabS2$logs %>% apply(1, mean),
+               rmse_7 = res_tabS2$rmse %>% apply(1, mean),
+               PI_75 = res_tabS2$pi_75 %>% apply(1, mean), 
+               PI_90 = res_tabS2$pi_90 %>% apply(1, mean), 
+               PI_95 = res_tabS2$pi_95 %>% apply(1, mean), 
+               running_times = times * 60) %>% as.data.frame() 
+
+tabS2 %>% write_csv("./results/summarized_results_and_tables/tableS2.csv")
+

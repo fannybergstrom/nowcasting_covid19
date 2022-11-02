@@ -1,4 +1,5 @@
 # This document is for summarizing the nowcasting results
+# used for plots and tables.
 
 # Load packages
 pacman::p_load(
@@ -270,3 +271,27 @@ tabS2 <- bind_cols(model = files_summary %>% str_remove(".csv"),
 
 tabS2 %>% write_csv("./results/summarized_results_and_tables/tableS2.csv")
 
+### Table S3
+
+# Extract rep dates for the comparison
+rep_dates_s3 <- rep_dates[(1:11)*10]
+
+files_mod_r <- str_c("./results/N/N_mod_a_ph_", rep_dates_s3, ".csv")
+files_mod_r2 <- str_c("./results/N/N_mod_r2_", rep_dates_s3, ".csv")
+
+N_list_s3 <- lapply(c(files_mod_r, files_mod_r2) , read_csv)
+scores_s3 <- calculate_scores(N_list = N_list_s3, rep_date = c(rep_dates_s3,rep_dates_s3))
+
+T_s3 <- bind_cols(model = c(rep("mod_r", 11), rep("mod_r2", 11)),
+                   crps_7 = scores_s3$crps %>% apply(1, mean),
+                   logs_7 = scores_s3$logs %>% apply(1, mean),
+                   rmse_7 = scores_s3$rmse %>% apply(1, mean),
+                   PI_75 = scores_s3$pi_75 %>% apply(1, mean), 
+                   PI_90 = scores_s3$pi_90 %>% apply(1, mean), 
+                   PI_95 = scores_s3$pi_95 %>% apply(1, mean)) %>% 
+  as.data.frame() %>% 
+  group_by(model) %>% summarise(crps = mean(crps_7), logs = mean(logs_7), rmse = mean(rmse_7),
+                                PI_75 = mean(PI_75), PI_90 = mean(PI_90), PI_95 = mean(PI_95))
+  
+# Write table
+write_csv(T_s3, "./results/summarized_results_and_tables/tableS3.csv")

@@ -2,6 +2,7 @@
 
 # Import functions
 source("./code/2_functions.r")
+
 # Import data
 dat <- read_csv("./data/covid_deaths.csv")
 
@@ -18,8 +19,8 @@ rep_dates <- list.files(path = paste0("./data/fohm/")) %>%
 models <- c("mod_r", "mod_r_cases", "mod_l", "mod_l_cases", 
             "mod_l_2", "mod_rl", "mod_rl_cases", "mod_rl_2")
 
-for(i in c(2:10*10)){
+for(i in c(6*10)){
   now <- rep_dates[i]
-  model_spec <- "mod_r"
+  model_spec <- "mod_r2"
   lapply(model_spec , evaluate_nowcast, dat = dat, now = now)
 }

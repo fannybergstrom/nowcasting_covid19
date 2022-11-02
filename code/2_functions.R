@@ -1,11 +1,12 @@
-# This document is for functions used to perform the Nowcasting
+#### This document is for functions used to perform the Nowcasting ###
 
-# Load packages
+## Load packages
 pacman::p_load(
-  tidyverse, data.table, lubridate, readxl, readr, zoo, splitstackshape, cmdstanr,
-  posterior, abind)
+  tidyverse, data.table, lubridate, readxl, readr, ggpubr,
+  zoo, splitstackshape, cmdstanr, posterior, abind, wesanderson,
+  scoringRules, scales, ggsci, extrafont, patchwork, viridis)
 
-# Function for computing reporting triangle and prepaire data
+## Function for computing reporting triangle and prepaire data
 prepare_data_list <- function(dat,
                               now,
                               begin_date = start,
@@ -48,10 +49,10 @@ prepare_data_list <- function(dat,
   # Replace unobserved dates with 0
   n[is.na(n)] <- 0
   
-  ## Weekday W
-  ## Additional part of the discrete survival model design matrix W = [ W_cp W_extra]
+  # Weekday W
+  # Additional part of the discrete survival model design matrix W = [ W_cp W_extra]
   # Make designmatrix for weekdays
-  ## Make a factor for each "Wed", "Thu", "Fri" ("Tue" is reference)
+  # Make a factor for each "Wed", "Thu", "Fri" ("Tue" is reference)
   wdays <- 4:6
   # Create the extension of the W matrix
   W_wd <- array(NA,
@@ -136,7 +137,7 @@ prepare_data_list <- function(dat,
 }
 
 
-# Function for performing the nowcasts and saving results
+## Function for performing the nowcasts and saving results
 evaluate_nowcast <- function(dat, model, now, D_max = 35) {
   
   #Start running time

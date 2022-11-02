@@ -1,17 +1,17 @@
 # This document is for summarizing the nowcasting results
 # used for plots and tables.
 
-# Load packages
+## Load packages
 pacman::p_load(
   tidyverse, data.table, lubridate, surveillance,
   readxl, readr, zoo, splitstackshape, cmdstanr,
   posterior, abind, scoringRules
 )
 
-# Import data
+## Import data
 dat <- read_csv("./data/covid_deaths.csv")
 
-# Restrict dataset to a specific nowcast date
+## Restrict dataset to a specific nowcast date
 rep_dates <- list.files(path = paste0("./data/fohm/")) %>%
   str_extract("\\d+-\\d+-\\d+") %>%
   as.data.frame() %>%
@@ -29,8 +29,7 @@ list_files <- function(parameter, mod) {
   files[str_detect(files, mod)]
 }
 
-# List files
-
+## List files
 s = 21
 n <- 116
 files_mod_a <- list_files("N", "mod_a_ph")[s:(s + n)]

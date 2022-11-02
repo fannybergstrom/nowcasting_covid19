@@ -1,10 +1,7 @@
 #### Plots and tables
 
-# Load packages
-pacman::p_load(
-  tidyverse, data.table, lubridate, readxl, readr, ggpubr,
-  zoo, splitstackshape, cmdstanr, posterior, abind, wesanderson,
-  scoringRules, scales, ggsci, extrafont, patchwork, viridis)
+# Load packages and functions
+source("./code/2_functions.r")
 
 loadfonts(device = "win")
 
@@ -67,7 +64,7 @@ FHM_cases <- read_excel("./data/FoHM/fohm_covid19_2022-05-12.xlsx",
   sheet = "Antal per dag region"
 )
 
-# remove final row
+# Remove final row
 FHM_deaths <- FHM_deaths[-nrow(FHM_deaths), ]
 
 # Save dates
@@ -85,16 +82,6 @@ ts <- FHM_deaths %>%
     mean_d = rollmean(n_deaths, k = 21, fill = NA, align = "center"),
     mean_i = rollmean(n_icu, k = 21, fill = NA, align = "center")
   )
-
-n_icu <- FHM_ICU %>%
-  select(date = Datum_vårdstart, n_icu = Antal_intensivvårdade) %>%
-  filter(date >= "2020-10-20", date <= "2021-05-21") %>%
-  summarise(n = sum(n_icu))
-
-n_cases <- FHM_cases %>%
-  select(date = Statistikdatum, n_cases = Totalt_antal_fall) %>%
-  filter(date >= "2020-10-20", date <= "2021-05-21") %>%
-  summarise(n = sum(n_cases))
 
 max_death <- ts %>% filter(date < "2021-02-21") %>% 
   filter(mean_d == max(mean_d, na.rm = T))
@@ -163,6 +150,7 @@ rep_dates <- list.files(path = paste0("./data/fohm/")) %>%
 n <- 60
 now <- ymd(rep_dates[n])
 start <- ymd(now - 7 * 8 + 1)
+
 dat_mod <- dat %>%
   filter(rep_date <= now)
 
@@ -176,6 +164,7 @@ post_N_a <- tibble(
   q5_a = apply(N_a, 2, function(x) quantile(x, .025)),
   q95_a = apply(N_a, 2, function(x) quantile(x, .975))
 )
+
 post_N_b <- tibble(
   date = seq(now - (55), now, "1 day"),
   med_b = apply(N_b, 2, median),
@@ -314,7 +303,6 @@ snap_res_d
 p_est_a_1230 <- read_csv("./results/p/p_mod_r_ph_2020-12-30.csv")
 p_est_d_1230 <- read_csv("./results/p/p_mod_rl_2020-12-30.csv")
 p_est_b_1230 <- read_csv("./results/p/p_mod_l_2020-12-30.csv")
-dat <- read_csv("./data/covid_deaths.csv")
 
 p_1230_emp <- dat %>%
   mutate(delay = as.numeric(rep_date - death_date)) %>%
@@ -862,8 +850,100 @@ fig7 <- log_plot_7 + crps_plot_7 + plot_annotation(tag_levels = c("A", "B")) +
 ggsave(paste0("./plots/fig7.png"), units = "in", dpi = 300, fig7, height = 3.5, width = 5.2)
 #ggsave(paste0("./plots/fig7.tiff"), units = "in", dpi = 300, fig7, height = 3.5, width = 5.2)
 
+
+
+
 # SI
+
 # Fig S1
+# Transforming (reversing) dates
+c_trans <- function(a, b, breaks = b$breaks, format = b$format) {
+  a <- as.trans(a)
+  b <- as.trans(b)
+  name <- paste(a$name, b$name, sep = "-")
+  trans <- function(x) a$trans(b$trans(x))
+  inv <- function(x) b$inverse(a$inverse(x))
+  trans_new(name, trans, inverse = inv, breaks = breaks, format=format)
+}
+
+D <- 35
+now <- "2020-12-30" %>% as.Date()
+start <- now -35
+
+plot_dat <- dat %>%
+  group_by(death_date, rep_date) %>%
+  summarise(n_true_retro = as.factor(n())) %>%
+  mutate(
+    delay = rep_date - death_date,
+    Reported = case_when(
+      death_date <= now - delay ~ "n_obs",
+      death_date > now - delay ~ "unrep"
+    ),
+    Reported = factor(Reported, levels= c("n_obs", "unrep"), ordered = T),
+    death_date = as.POSIXct(death_date)
+  ) %>% 
+  filter(death_date >= start, death_date <= now +1, delay <= D)
+rev_date <- c_trans("reverse", "time")
+
+p1 <- plot_dat %>% ggplot(aes(x = as.numeric(delay), y = death_date)) +
+  theme_bw() +
+  xlab("Days delay") +
+  ylab("Date") +
+  geom_tile(aes(fill = Reported)) +
+  theme(panel.grid.major = element_line(color = "#eeeeee")) +
+  geom_text(aes(label = n_true_retro),size = 1.5) +
+  coord_cartesian(xlim = c(1, 34)) +
+  scale_y_continuous(trans = rev_date, 
+                     breaks = as.POSIXct(c("2020-11-25", "2020-12-02", "2020-12-09",
+                                           "2020-12-16","2020-12-23","2020-12-30")),
+                     labels = c("20-11-25", "20-12-02", "20-12-09",
+                                "20-12-16","20-12-23","20-12-30"),
+                     expand = c(0.02, 0.02))+
+  scale_fill_manual(values = c(n_obs = "#51C56AFF", unrep = "#FDE725FF"),
+                    labels = c("Reported", "Occurred but not yet reported")) +
+  theme(
+    legend.position = "none",
+    text = element_text(size = 8, family = "TT Arial")
+  ) 
+
+dat_mod <- dat %>% filter(rep_date <= now)
+
+p2 <- dat %>% group_by(date=death_date) %>%
+  summarise(n_true_retro=n()) %>%
+  left_join(dat_mod %>% group_by(date=death_date) %>%
+              summarise(n_obs=n())) %>%
+  mutate_if(is.integer, ~replace(., is.na(.), 0)) %>%
+  filter(date >= start, date <= now) %>%
+  mutate(unrep = n_true_retro-n_obs) %>% 
+  gather(Reported, n, c(n_obs,unrep)) %>% 
+  mutate(Reported = factor(Reported, levels= c( "unrep", "n_obs"), ordered = T)) %>% 
+  ggplot()+
+  geom_col(aes(date, n, fill = Reported)) +
+  xlab("Date") +
+  ylab("Deaths") +
+  scale_x_date(breaks = as.Date(c("2020-11-25", "2020-12-02", "2020-12-09",
+                                  "2020-12-16","2020-12-23","2020-12-30")), 
+               date_labels = "%y-%m-%d",
+               expand = c(0.02, 0.02))+
+  scale_fill_manual(values = c(n_obs="#51C56AFF",unrep = "#FDE725FF" ),
+                    labels = c("Reported", "Occurred but not yet reported"))+
+  theme(
+    legend.position = "bottom",
+    legend.background = element_blank(),
+    legend.title = element_blank(),
+    plot.margin = margin(0, 0, 0, 0, "cm"),
+    text = element_text(size = 8, family = "TT Arial"),
+    legend.box.margin = margin(-10, -10, -10, -10)
+  ) 
+
+swe_rep <- p1 + p2 + plot_annotation(tag_levels = c("A", "B")) + plot_layout( ncol =1) 
+
+ggsave(paste0("./plots/figS1.png"), units = "in", dpi = 300, swe_rep, height = 5, width = 5.2)
+ggsave(paste0("./plots/figS1.tiff"), units = "in", dpi = 300, swe_rep, height = 4, width = 5.2, compression = "lzw")
+
+
+# Fig S2
+
 plot_est_a_1230 <- p_1230_a_est %>%
   filter(delay %in% c(1, 3, 7, 10, 14, 21, 35)) %>%
   mutate(Delay = factor(delay,
@@ -987,11 +1067,11 @@ figS1 <- plot_emp_1230 + plot_est_a_1230 +
 )
 
 
-ggsave(paste0("./plots/figS1.png"), units = "in", dpi = 300, figS1, height = 4, width = 5.2)
-#ggsave(paste0("./plots/figS1.tiff"), units = "in", dpi = 300, figS1, height = 4, width = 5.2)
+ggsave(paste0("./plots/figS2.png"), units = "in", dpi = 300, figS1, height = 4, width = 5.2)
+#ggsave(paste0("./plots/figS2.tiff"), units = "in", dpi = 300, figS1, height = 4, width = 5.2)
 
 
-# S2
+# S3
 rep_plot_dc <- res_df %>%
   ggplot(aes(x = date)) +
   geom_line(aes(y = med_d_c, color = "RL(Cases)")) +
@@ -1050,10 +1130,10 @@ rep_plot_dic <- res_df %>%
   )
 rep_plot_dic
 
-figS2 <- ggarrange(rep_plot_dc, rep_plot_dic, nrow = 2)
-figS2
-ggsave(paste0("./plots/figS2.png"), units = "in", dpi = 300, figS2, height = 3.9, width = 5.2)
-#ggsave(paste0("./plots/figS2.tiff"), units = "in", dpi = 300, figS2, height = 3.9, width = 5.2)
+figS3 <- ggarrange(rep_plot_dc, rep_plot_dic, nrow = 2)
+figS3
+ggsave(paste0("./plots/figS3.png"), units = "in", dpi = 300, figS2, height = 3.9, width = 5.2)
+#ggsave(paste0("./plots/figS3.tiff"), units = "in", dpi = 300, figS2, height = 3.9, width = 5.2)
 
 # Fig S3 (beta)
 
@@ -1121,11 +1201,110 @@ figS4 <- res_beta_1_d %>%
   scale_color_manual(values = c("RL(ICU)" = wes_cols[3]))
 figS4
 
-ggsave(paste0("./plots/figS4.png"), units = "in", dpi = 300, figS4, height = 2, width = 5.2)
-ggsave(paste0("./plots/figS4.tiff"), units = "in", dpi = 300, figS4, height = 2, width = 5.2)
+ggsave("./plots/figS4.png", units = "in", dpi = 300, figS4, height = 2, width = 5.2)
+ggsave("./plots/figS4.tiff", units = "in", dpi = 300, figS4, height = 2, width = 5.2)
 
 
-# SI Fig1 RMSE
+# Fig SI Appendix S5
+n <- 60
+now <- ymd(rep_dates[n])
+start <- ymd(now - 7 * 8 + 1)
+dat_mod <- dat %>%
+  filter(rep_date <= now)
+
+N_r2 <- lapply(paste0("./results/N/", "N_mod_r2_2020-12-30.csv"), read_csv) %>% as.data.frame()
+post_N_r2 <- tibble(
+  date = seq(now - (55), now, "1 day"),
+  med_r2 = apply(N_r2, 2, median),
+  q5_r2 = apply(N_r2, 2, function(x) quantile(x, .025)),
+  q95_r2 = apply(N_r2, 2, function(x) quantile(x, .975))
+)
+
+snap_res_r <- dat_mod %>%
+  group_by(date = death_date) %>%
+  summarise(n_obs = sum(n)) %>%
+  right_join(tibble(date = seq(start, now, by = "1 day"))) %>%
+  left_join(post_N_a) %>%
+  left_join(dat %>% group_by(date = death_date) %>%
+              summarise(n_true_retro = sum(n))) %>%
+  mutate_if(is.integer, ~ replace(., is.na(.), 0)) %>%
+  filter(date > (now - 36)) %>%
+  pivot_longer(c(med_a, n_true_retro)) %>%
+  ggplot() +
+  geom_line(aes(date, value, color = name, linetype = name)) +
+  geom_ribbon(aes(date, ymin = q5_a, ymax = q95_a), fill = cols[4], alpha = .2) +
+  geom_col(aes(date, n_obs / 2)) +
+  ylab("Number Fatalities") +
+  xlab("Date") +
+  coord_cartesian(ylim = c(0, 230)) +
+  scale_color_manual(
+    values = c(med_a = cols[4], n_true_retro = cols[1]),
+    labels = c("R", "True number")
+  ) +
+  scale_x_date(breaks = dates, date_labels = "%y-%m-%d", expand = c(0.02, 0.02)) +
+  scale_linetype_manual(
+    values = c(med_a = 1, n_true_retro = 2),
+    labels = c("R", "True number")
+  ) +
+  theme(
+    legend.background = element_blank(),
+    legend.position = "bottom",
+    legend.title = element_blank(),
+    text = element_text(size = 8, family = "TT Arial"),
+    legend.box.margin = margin(-20, -15, -15, -15),
+    legend.direction = "vertical",
+    legend.spacing = unit(0.01, "mm"),
+    plot.margin = margin(0.2, 0.2, 0.3, 0.2, "cm")
+  )
+
+
+
+snap_res_r2 <- dat_mod %>%
+  group_by(date = death_date) %>%
+  summarise(n_obs = sum(n)) %>%
+  right_join(tibble(date = seq(start, now, by = "1 day"))) %>%
+  left_join(post_N_r2) %>%
+  left_join(dat %>% group_by(date = death_date) %>%
+              summarise(n_true_retro = sum(n))) %>%
+  mutate_if(is.integer, ~ replace(., is.na(.), 0)) %>%
+  filter(date > (now - 36)) %>%
+  pivot_longer(c(med_r2, n_true_retro)) %>%
+  ggplot() +
+  geom_line(aes(date, value, color = name, linetype = name)) +
+  geom_ribbon(aes(date, ymin = q5_r2, ymax = q95_r2), fill = cols[6], alpha = .2) +
+  geom_col(aes(date, n_obs / 2)) +
+  ylab("Number Fatalities") +
+  xlab("Date") +
+  coord_cartesian(ylim = c(0, 230)) +
+  scale_color_manual(
+    values = c(med_r2 = cols[6], n_true_retro = cols[1]),
+    labels = c("R2", "True number")
+  ) +
+  scale_x_date(breaks = dates, date_labels = "%y-%m-%d", expand = c(0.02, 0.02)) +
+  scale_linetype_manual(
+    values = c(med_r2 = 1, n_true_retro = 2),
+    labels = c("R", "True number")
+  ) +
+  theme(
+    legend.background = element_blank(),
+    legend.position = "bottom",
+    legend.title = element_blank(),
+    text = element_text(size = 8, family = "TT Arial"),
+    legend.box.margin = margin(-20, -15, -15, -15),
+    legend.direction = "vertical",
+    legend.spacing = unit(0.01, "mm"),
+    plot.margin = margin(0.2, 0.2, 0.3, 0.2, "cm")
+  )
+
+plot_s5 <- snap_res_r + snap_res_r2
+plot_s5
+
+ggsave("./plots/S5_fig.png", units = "in", dpi = 300, 
+       plot_s5, height = 1.75, width = 5.2)
+
+
+
+# FigS1 RMSE
 
 # RMSE 7days
 # dates <- c(as.Date("2020-11-01"), as.Date("2021-01-01"), as.Date("2021-03-01"), as.Date("2021-05-01"))
@@ -1162,91 +1341,6 @@ ggsave(paste0("./plots/S1_fig.tiff"), units = "in", dpi = 300, rmse7_plot, heigh
 
 
 
-# Fig S2
-# Transforming (reversing) dates
-c_trans <- function(a, b, breaks = b$breaks, format = b$format) {
-  a <- as.trans(a)
-  b <- as.trans(b)
-  name <- paste(a$name, b$name, sep = "-")
-  trans <- function(x) a$trans(b$trans(x))
-  inv <- function(x) b$inverse(a$inverse(x))
-  trans_new(name, trans, inverse = inv, breaks = breaks, format=format)
-}
-
-D <- 35
-now <- "2020-12-30" %>% as.Date()
-start <- now -35
-
-plot_dat <- dat %>%
-  group_by(death_date, rep_date) %>%
-  summarise(n_true_retro = as.factor(n())) %>%
-  mutate(
-    delay = rep_date - death_date,
-    Reported = case_when(
-      death_date <= now - delay ~ "n_obs",
-      death_date > now - delay ~ "unrep"
-    ),
-    Reported = factor(Reported, levels= c("n_obs", "unrep"), ordered = T),
-    death_date = as.POSIXct(death_date)
-  ) %>% 
-  filter(death_date >= start, death_date <= now +1, delay <= D)
-rev_date <- c_trans("reverse", "time")
-
-p1 <- plot_dat %>% ggplot(aes(x = as.numeric(delay), y = death_date)) +
-  theme_bw() +
-  xlab("Days delay") +
-  ylab("Date") +
-  geom_tile(aes(fill = Reported)) +
-  theme(panel.grid.major = element_line(color = "#eeeeee")) +
-  geom_text(aes(label = n_true_retro),size = 1.5) +
-  coord_cartesian(xlim = c(1, 34)) +
-  scale_y_continuous(trans = rev_date, 
-                     breaks = as.POSIXct(c("2020-11-25", "2020-12-02", "2020-12-09",
-                                           "2020-12-16","2020-12-23","2020-12-30")),
-                     labels = c("20-11-25", "20-12-02", "20-12-09",
-                                "20-12-16","20-12-23","20-12-30"),
-                     expand = c(0.02, 0.02))+
-  scale_fill_manual(values = c(n_obs = "#51C56AFF", unrep = "#FDE725FF"),
-                    labels = c("Reported", "Occurred but not yet reported")) +
-  theme(
-    legend.position = "none",
-    text = element_text(size = 8, family = "TT Arial")
-  ) 
-
-dat_mod <- dat %>% filter(rep_date <= now)
-
-p2 <- dat %>% group_by(date=death_date) %>%
-  summarise(n_true_retro=n()) %>%
-  left_join(dat_mod %>% group_by(date=death_date) %>%
-              summarise(n_obs=n())) %>%
-  mutate_if(is.integer, ~replace(., is.na(.), 0)) %>%
-  filter(date >= start, date <= now) %>%
-  mutate(unrep = n_true_retro-n_obs) %>% 
-  gather(Reported, n, c(n_obs,unrep)) %>% 
-  mutate(Reported = factor(Reported, levels= c( "unrep", "n_obs"), ordered = T)) %>% 
-  ggplot()+
-  geom_col(aes(date, n, fill = Reported)) +
-  xlab("Date") +
-  ylab("Deaths") +
-  scale_x_date(breaks = as.Date(c("2020-11-25", "2020-12-02", "2020-12-09",
-                                  "2020-12-16","2020-12-23","2020-12-30")), 
-               date_labels = "%y-%m-%d",
-               expand = c(0.02, 0.02))+
-  scale_fill_manual(values = c(n_obs="#51C56AFF",unrep = "#FDE725FF" ),
-                    labels = c("Reported", "Occurred but not yet reported"))+
-  theme(
-    legend.position = "bottom",
-    legend.background = element_blank(),
-    legend.title = element_blank(),
-    plot.margin = margin(0, 0, 0, 0, "cm"),
-    text = element_text(size = 8, family = "TT Arial"),
-    legend.box.margin = margin(-10, -10, -10, -10)
-  ) 
-
-swe_rep <- p1 + p2 + plot_annotation(tag_levels = c("A", "B")) + plot_layout( ncol =1) 
-  
-ggsave(paste0("./plots/figS5.png"), units = "in", dpi = 300, swe_rep, height = 5, width = 5.2)
-ggsave(paste0("./plots/figS5.tiff"), units = "in", dpi = 300, swe_rep, height = 4, width = 5.2, compression = "lzw")
 
 
 

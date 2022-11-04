@@ -1,4 +1,4 @@
-# Evaluation of the nowcasting models
+#### Evaluation of the nowcasting models ####
 
 # Import functions
 source("./code/2_functions.r")
@@ -19,8 +19,8 @@ rep_dates <- list.files(path = paste0("./data/fohm/")) %>%
 models <- c("mod_r", "mod_r_cases", "mod_l", "mod_l_cases", 
             "mod_l_2", "mod_rl", "mod_rl_cases", "mod_rl_2")
 
-for(i in c(6*10)){
+for(i in 60){
   now <- rep_dates[i]
-  model_spec <- "mod_r2"
+  model_spec <- "mod_r"
   lapply(model_spec , evaluate_nowcast, dat = dat, now = now)
 }

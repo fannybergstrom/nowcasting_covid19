@@ -1,12 +1,8 @@
-# This document is for summarizing the nowcasting results
-# used for plots and tables.
+#### This document is for summarizing the nowcasting results
+#### used for plots and tables.
 
-## Load packages
-pacman::p_load(
-  tidyverse, data.table, lubridate, surveillance,
-  readxl, readr, zoo, splitstackshape, cmdstanr,
-  posterior, abind, scoringRules
-)
+# Load packages and functions
+source("./code/2_functions.r")
 
 ## Import data
 dat <- read_csv("./data/covid_deaths.csv")
@@ -30,7 +26,7 @@ list_files <- function(parameter, mod) {
 }
 
 ## List files
-s = 21
+s <- 21
 n <- 116
 files_mod_a <- list_files("N", "mod_a_ph")[s:(s + n)]
 files_mod_b <- list_files("N", "mod_b_cp")[s:(s + n)]
@@ -58,24 +54,6 @@ N_mod_d <- lapply(paste0("./results/N/", files_mod_d), read_csv)
 N_mod_d_c <- lapply(paste0("./results/N/", files_mod_d_c), read_csv)
 N_mod_e <- lapply(paste0("./results/N/", files_mod_e), read_csv)
 
-## Function for creating results table
-med_and_quantiles <- function(sample_list) {
-  df_med <- c()
-  for (i in 1:length(sample_list)) {
-    l <- sample_list[[i]]
-    now <- ymd(rep_dates[i])
-    start <- now - 7 * 8 + 1
-    post <- tibble(
-      date = seq(start, now, "1 day"),
-      med = apply(l, 2, median),
-      q5 = apply(l, 2, function(x) quantile(x, .025)),
-      q95 = apply(l, 2, function(x) quantile(x, .975))
-    ) %>%
-      mutate(now = now, delay = 55:0)
-    df_med <- bind_rows(df_med, post)
-  }
-  df_med %>% filter(delay <= 35)
-}
 
 N_a_df <- med_and_quantiles(N_mod_a)
 N_b_df <- med_and_quantiles(N_mod_b)
@@ -84,35 +62,6 @@ N_c_df <- med_and_quantiles(N_mod_c)
 N_d_df <- med_and_quantiles(N_mod_d)
 N_d_c_df <- med_and_quantiles(N_mod_d_c)
 N_e_df <- med_and_quantiles(N_mod_e)
-
-
-##### Scores
-calculate_scores <- function(N_list, m_delay = 6, rep_date = rep_dates) {
-  res_rmse <- res_crps <- res_logs <- pi_75 <- pi_90 <- pi_95 <- matrix(NA, length(N_list), (m_delay+1))
-  for (i in 1:length(N_list)) {
-    for (j in 1:(m_delay+1)) {
-      v <- N_list[[i]][, (56 + 1 - j)] %>% unlist()
-      truth <- retro_truth %>%
-        filter(date == as.Date(rep_date[i]) - j + 1) %>%
-        select(n_true_retro) %>%
-        unlist()
-      res_rmse[i, j] <- sqrt((median(v) - truth)^2)
-      res_logs[i, j] <- logs_sample(y = truth, dat = v)
-      res_crps[i, j] <- crps_sample(y = truth, dat = v)
-      pi_75[i, j] <- between(truth, quantile(v, .125), quantile(v, .875))
-      pi_90[i, j] <- between(truth, quantile(v, .05), quantile(v, .95))
-      pi_95[i, j] <- between(truth, quantile(v, .025), quantile(v, .975))
-    }
-  }
-  list(
-    rmse = res_rmse,
-    logs = res_logs,
-    crps = res_crps,
-    pi_75 = pi_75,
-    pi_90 = pi_90,
-    pi_95 = pi_95
-  )
-}
 
 
 Nres_mod_a <- calculate_scores(N_mod_a)
@@ -241,56 +190,63 @@ write_csv(beta_1_df_d, "../results/summarized_results_and_tables/results_beta_1_
 
 ## Table S2
 path_summary <- "./results/summary/"
-files_summary <- list.files(path_summary) 
-files_summary <- files_summary[str_detect(files_summary,"12-30")]
-summary_list <- lapply(path_summary %>% paste0(files_summary) , read_csv)
+files_summary <- list.files(path_summary)
+files_summary <- files_summary[str_detect(files_summary, "12-30")]
+summary_list <- lapply(path_summary %>% paste0(files_summary), read_csv)
 
 # Running times
 times <- c()
-for(l in 1:length(files_summary)){
+for (l in 1:length(files_summary)) {
   times[l] <- summary_list[[l]]$run_time[1]
 }
 
 path_N <- "./results/N/n_" %>% paste0(files_summary)
 path_N <- str_remove(path_N, "placeholder")
 
-N_list <- lapply(path_N , read_csv)
+N_list <- lapply(path_N, read_csv)
 
 res_tabS2 <- calculate_scores(N_list = N_list, rep_date = rep("2020-12-30", length(N_list)))
 
 # Collecting results
-tabS2 <- bind_cols(model = files_summary %>% str_remove(".csv"), 
-               crps_7 = res_tabS2$crps %>% apply(1, mean),
-               logs_7 = res_tabS2$logs %>% apply(1, mean),
-               rmse_7 = res_tabS2$rmse %>% apply(1, mean),
-               PI_75 = res_tabS2$pi_75 %>% apply(1, mean), 
-               PI_90 = res_tabS2$pi_90 %>% apply(1, mean), 
-               PI_95 = res_tabS2$pi_95 %>% apply(1, mean), 
-               running_times = times * 60) %>% as.data.frame() 
+tabS2 <- bind_cols(
+  model = files_summary %>% str_remove(".csv"),
+  crps_7 = res_tabS2$crps %>% apply(1, mean),
+  logs_7 = res_tabS2$logs %>% apply(1, mean),
+  rmse_7 = res_tabS2$rmse %>% apply(1, mean),
+  PI_75 = res_tabS2$pi_75 %>% apply(1, mean),
+  PI_90 = res_tabS2$pi_90 %>% apply(1, mean),
+  PI_95 = res_tabS2$pi_95 %>% apply(1, mean),
+  running_times = times * 60
+) %>% as.data.frame()
 
 tabS2 %>% write_csv("./results/summarized_results_and_tables/tableS2.csv")
 
 ### Table S3
 
 # Extract rep dates for the comparison
-rep_dates_s3 <- rep_dates[(1:11)*10]
+rep_dates_s3 <- rep_dates[(1:11) * 10]
 
 files_mod_r <- str_c("./results/N/N_mod_a_ph_", rep_dates_s3, ".csv")
 files_mod_r2 <- str_c("./results/N/N_mod_r2_", rep_dates_s3, ".csv")
 
-N_list_s3 <- lapply(c(files_mod_r, files_mod_r2) , read_csv)
-scores_s3 <- calculate_scores(N_list = N_list_s3, rep_date = c(rep_dates_s3,rep_dates_s3))
+N_list_s3 <- lapply(c(files_mod_r, files_mod_r2), read_csv)
+scores_s3 <- calculate_scores(N_list = N_list_s3, rep_date = c(rep_dates_s3, rep_dates_s3))
 
-T_s3 <- bind_cols(model = c(rep("mod_r", 11), rep("mod_r2", 11)),
-                   crps_7 = scores_s3$crps %>% apply(1, mean),
-                   logs_7 = scores_s3$logs %>% apply(1, mean),
-                   rmse_7 = scores_s3$rmse %>% apply(1, mean),
-                   PI_75 = scores_s3$pi_75 %>% apply(1, mean), 
-                   PI_90 = scores_s3$pi_90 %>% apply(1, mean), 
-                   PI_95 = scores_s3$pi_95 %>% apply(1, mean)) %>% 
-  as.data.frame() %>% 
-  group_by(model) %>% summarise(crps = mean(crps_7), logs = mean(logs_7), rmse = mean(rmse_7),
-                                PI_75 = mean(PI_75), PI_90 = mean(PI_90), PI_95 = mean(PI_95))
-  
+T_s3 <- bind_cols(
+  model  = c(rep("mod_r", 11), rep("mod_r2", 11)),
+  crps_7 = scores_s3$crps %>% apply(1, mean),
+  logs_7 = scores_s3$logs %>% apply(1, mean),
+  rmse_7 = scores_s3$rmse %>% apply(1, mean),
+  PI_75  = scores_s3$pi_75 %>% apply(1, mean),
+  PI_90  = scores_s3$pi_90 %>% apply(1, mean),
+  PI_95  = scores_s3$pi_95 %>% apply(1, mean)
+) %>%
+  as.data.frame() %>%
+  group_by(model) %>%
+  summarise(
+    crps = mean(crps_7), logs = mean(logs_7), rmse = mean(rmse_7),
+    PI_75 = mean(PI_75), PI_90 = mean(PI_90), PI_95 = mean(PI_95)
+  )
+
 # Write table
 write_csv(T_s3, "./results/summarized_results_and_tables/tableS3.csv")

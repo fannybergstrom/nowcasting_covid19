@@ -1,6 +1,5 @@
 /results/*
-*.Rproj
 .R*
 !/results/summarized_results_and_tables*
-!*p_mod_r*
 !*placeholder*
+.Rproj.user

@@ -1,4 +1,4 @@
-#### Plots and tables
+#### Plots and tables ####
 
 # Load packages and functions
 source("./code/2_functions.r")
@@ -13,18 +13,18 @@ res_df <- read_csv("./results/summarized_results_and_tables/results.csv") %>%
 # Plot theme and color
 theme_set(theme_bw())
 cols <- pal_nejm("default", alpha = 1)(8)
-wes_cols <- wes_palette("Darjeeling1", 5)
+wes_cols <- wes_palette("Darjeeling1", 5) %>% c(wes_palette("FantasticFox1"))
 vir_cols <- viridis_pal()(12)
 
 # Figure 1, observed and unreported.
 now <- "2022-02-01"
 start <- "2022-01-01"
-dat_mod <- dat %>% filter(rep_date <= now)
 obs_plot <- dat %>%
   group_by(date = death_date) %>%
-  summarise(n_true_retro = n()) %>%
-  left_join(dat_mod %>% group_by(date = death_date) %>%
-    summarise(n_obs = n())) %>%
+  summarise(n_true_retro = sum(n)) %>%
+  left_join(dat %>% filter(rep_date <= now) %>% 
+              group_by(date = death_date) %>%
+              summarise(n_obs = sum(n))) %>%
   mutate_if(is.integer, ~ replace(., is.na(.), 0)) %>%
   filter(date >= start, date <= now) %>%
   ggplot() +
@@ -32,6 +32,7 @@ obs_plot <- dat %>%
   geom_col(aes(date, n_obs, fill = "Reported")) +
   ylab("Number Fatalities") +
   xlab("Date") +
+  scale_y_continuous(breaks = 0:5*10, expand = c(0.02, 0.02)) +
   scale_x_date(breaks = as.Date(c(
     "2022-01-01", "2022-01-07", "2022-01-13", "2022-01-19",
     "2022-01-26", "2022-02-01"
@@ -40,7 +41,7 @@ obs_plot <- dat %>%
     legend.background = element_blank(),
     legend.title = element_blank(),
     legend.position = "bottom",
-    text = element_text(size = 8, family = "TT Arial"),
+    text = element_text(size = 8, family = "sans"),
     legend.box.margin = margin(-10, -10, -10, -10)
   ) +
   scale_fill_manual(values = c("Reported" = "grey30", "Occurred but not yet reported" = "gray"))
@@ -112,14 +113,14 @@ timeseries_plots <- ts %>%
     legend.background = element_blank(),
     legend.position = "bottom",
     legend.title = element_blank(),
-    text = element_text(size = 8, family = "TT Arial"),
+    text = element_text(size = 8, family = "sans"),
     legend.box.margin = margin(-10, -10, -10, -10)
   ) +
   scale_x_date(
     date_breaks = "1 month", date_labels = "%y-%m-%d",
     limits = c(as.Date("2020-10-20"), as.Date("2021-05-21")), expand = c(0.02, 0.02)
   ) +
-  scale_y_continuous(breaks=seq(0, 1, by = 0.25))+
+  scale_y_continuous(breaks=seq(0, 1, by = 0.25), c(0.02, 0.02))+
   scale_color_manual(
     values = c(mean_c = cols[6], mean_i = cols[3], mean_d = cols[1]),
     labels = c(mean_c = "Reported cases", mean_i = "ICU admissions", mean_d = "Fatalities")
@@ -139,6 +140,54 @@ ggsave(paste0("./plots/fig2.png"), units = "in", dpi = 300, timeseries_plots, he
 # Fig 4
 
 ## Single reporting day
+fig_1day <- function(N_mod, now = as.Date("2020-12-30"), fig_col = "blue", fig_label = "Model type"){
+  post_N <- tibble(
+    date = seq(now - (55), now, "1 day"),
+    med = apply(N_mod, 2, median),
+    q5 = apply(N_mod, 2, function(x) quantile(x, .025)),
+    q95 = apply(N_mod, 2, function(x) quantile(x, .975))
+  )
+  
+  start <- ymd(now - 7 * 8 + 1)
+
+  dat %>%
+    filter(rep_date <= now) %>%
+    group_by(date = death_date) %>%
+    summarise(n_obs = sum(n)) %>%
+    right_join(tibble(date = seq(start, now, by = "1 day"))) %>%
+    left_join(post_N) %>%
+    left_join(dat %>% group_by(date = death_date) %>%
+                summarise(n_true_retro = sum(n))) %>%
+    mutate_if(is.integer, ~ replace(., is.na(.), 0)) %>%
+    filter(date > (now - 36)) %>%
+    pivot_longer(c(med, n_true_retro)) %>%
+    ggplot() +
+    geom_line(aes(date, value, color = name, linetype = name)) +
+    geom_col(aes(date, n_obs / 2)) +
+    ylab("Number Fatalities") +
+    xlab("Date") +
+    geom_ribbon(aes(date, ymin = q5, ymax = q95), fill = fig_col, alpha = .2) +
+    scale_color_manual(
+      values = c(med = fig_col, n_true_retro = cols[1]),
+      labels = c(fig_label, "True number")
+    ) + 
+    scale_linetype_manual(
+      values = c(med = 1, n_true_retro = 2),
+      labels = c(fig_label, "True number")
+    ) +
+    theme(
+      legend.background = element_blank(),
+      legend.position = "bottom",
+      legend.title = element_blank(),
+      text = element_text(size = 8, family = "sans"),
+      legend.box.margin = margin(-20, -15, -15, -15),
+      legend.direction = "vertical",
+      legend.spacing = unit(0.01, "mm"),
+      plot.margin = margin(0.1, 0.2, 0.3, 0.1, "cm")
+    )
+}
+
+
 rep_dates <- list.files(path = paste0("./data/fohm/")) %>%
   str_extract("\\d+-\\d+-\\d+") %>%
   as.data.frame() %>%
@@ -147,155 +196,31 @@ rep_dates <- list.files(path = paste0("./data/fohm/")) %>%
   t() %>%
   as.vector()
 
+# Set dates
 n <- 60
 now <- ymd(rep_dates[n])
 start <- ymd(now - 7 * 8 + 1)
+path <- "./results/N/N_mod_"
 
-dat_mod <- dat %>%
-  filter(rep_date <= now)
-
-N_a <- lapply(paste0("./results/N/", "N_mod_r_2020-12-30.csv"), read_csv) %>% as.data.frame()
+# Import data
+N_a <- lapply(paste0(path,"r", now ".csv"), read_csv) %>% as.data.frame()
 N_b <- lapply(paste0("./results/N/", "N_mod_l_2020-12-30.csv"), read_csv) %>% as.data.frame()
 N_d <- lapply(paste0("./results/N/", "N_mod_rl_2020-12-30.csv"), read_csv) %>% as.data.frame()
 
-post_N_a <- tibble(
-  date = seq(now - (55), now, "1 day"),
-  med_a = apply(N_a, 2, median),
-  q5_a = apply(N_a, 2, function(x) quantile(x, .025)),
-  q95_a = apply(N_a, 2, function(x) quantile(x, .975))
-)
-
-post_N_b <- tibble(
-  date = seq(now - (55), now, "1 day"),
-  med_b = apply(N_b, 2, median),
-  q5_b = apply(N_b, 2, function(x) quantile(x, .025)),
-  q95_b = apply(N_b, 2, function(x) quantile(x, .975))
-)
-
-post_N_d <- tibble(
-  date = seq(now - (55), now, "1 day"),
-  med_d = apply(N_d, 2, median),
-  q5_d = apply(N_d, 2, function(x) quantile(x, .025)),
-  q95_d = apply(N_d, 2, function(x) quantile(x, .975))
-)
-
 dates <- c(seq(as.IDate("2020-11-25"), as.IDate("2020-12-30"), 12), as.Date("2020-12-30"))
 
-snap_res_a <- dat_mod %>%
-  group_by(date = death_date) %>%
-  summarise(n_obs = sum(n)) %>%
-  right_join(tibble(date = seq(start, now, by = "1 day"))) %>%
-  left_join(post_N_a) %>%
-  left_join(dat %>% group_by(date = death_date) %>%
-    summarise(n_true_retro = sum(n))) %>%
-  mutate_if(is.integer, ~ replace(., is.na(.), 0)) %>%
-  filter(date > (now - 36)) %>%
-  pivot_longer(c(med_a, n_true_retro)) %>%
-  ggplot() +
-  geom_line(aes(date, value, color = name, linetype = name)) +
-  geom_ribbon(aes(date, ymin = q5_a, ymax = q95_a), fill = cols[4], alpha = .2) +
-  geom_col(aes(date, n_obs / 2)) +
-  ylab("Number Fatalities") +
-  xlab("Date") +
-  coord_cartesian(ylim = c(0, 160)) +
-  scale_color_manual(
-    values = c(med_a = cols[4], n_true_retro = cols[1]),
-    labels = c("R", "True number")
-  ) +
-  scale_x_date(breaks = dates, date_labels = "%y-%m-%d", expand = c(0.02, 0.02)) +
-  scale_linetype_manual(
-    values = c(med_a = 1, n_true_retro = 2),
-    labels = c("R", "True number")
-  ) +
-  theme(
-    legend.background = element_blank(),
-    legend.position = "bottom",
-    legend.title = element_blank(),
-    text = element_text(size = 8, family = "TT Arial"),
-    legend.box.margin = margin(-20, -15, -15, -15),
-    legend.direction = "vertical",
-    legend.spacing = unit(0.01, "mm"),
-    plot.margin = margin(0.1, 0.2, 0.3, 0.1, "cm")
-  )
-
-snap_res_a
+snap_res_a <- fig_1day(N_a, fig_col = cols[4], fig_label = "R") +
+  scale_x_date(breaks = dates, date_labels = "%y-%m-%d", expand = c(0.02, 0.02))+
+  coord_cartesian(ylim = c(0, 160))
 
 
-snap_res_b <- dat_mod %>%
-  group_by(date = death_date) %>%
-  summarise(n_obs = sum(n)) %>%
-  right_join(tibble(date = seq(start, now, by = "1 day"))) %>%
-  left_join(post_N_b) %>%
-  left_join(dat %>% group_by(date = death_date) %>%
-    summarise(n_true_retro = sum(n))) %>%
-  mutate_if(is.integer, ~ replace(., is.na(.), 0)) %>%
-  filter(date > (now - 36)) %>%
-  pivot_longer(c(med_b, n_true_retro)) %>%
-  ggplot() +
-  geom_line(aes(date, value, col = name, linetype = name)) +
-  geom_ribbon(aes(date, ymin = q5_b, ymax = q95_b), fill = cols[2], alpha = .2) +
-  geom_col(aes(date, n_obs / 2)) +
-  ylab("Number Fatalities") +
-  xlab("Date") +
-  coord_cartesian(ylim = c(0, 160)) +
-  theme(
-    legend.background = element_blank(),
-    legend.position = "bottom",
-    legend.title = element_blank(),
-    text = element_text(size = 8, family = "TT Arial"),
-    legend.box.margin = margin(-20, -15, -15, -15),
-    plot.margin = margin(0.1, 0.2, 0.3, 0.1, "cm"),
-    legend.direction = "vertical",
-    legend.spacing = unit(0.01, "mm")
-  ) +
-  scale_color_manual(
-    values = c(med_b = cols[2], n_true_retro = cols[1]),
-    labels = c("L(ICU)", "True number")
-  ) +
-  scale_x_date(breaks = dates, date_labels = "%y-%m-%d", expand = c(0.02, 0.02)) +
-  scale_linetype_manual(
-    values = c(med_b = 1, n_true_retro = 2),
-    labels = c("L(ICU)", "True number")
-  )
+snap_res_b <- fig_1day(N_b, fig_col = cols[2], fig_label = "L(ICU)") +
+  scale_x_date(breaks = dates, date_labels = "%y-%m-%d", expand = c(0.02, 0.02))+
+  coord_cartesian(ylim = c(0, 160))
 
-snap_res_b
-
-snap_res_d <- dat_mod %>%
-  group_by(date = death_date) %>%
-  summarise(n_obs = sum(n)) %>%
-  right_join(tibble(date = seq(start, now, by = "1 day"))) %>%
-  left_join(post_N_d) %>%
-  left_join(dat %>% group_by(date = death_date) %>%
-    summarise(n_true_retro = sum(n))) %>%
-  mutate_if(is.integer, ~ replace(., is.na(.), 0)) %>%
-  filter(date > (now - 36)) %>%
-  pivot_longer(c(med_d, n_true_retro)) %>%
-  ggplot() +
-  geom_line(aes(date, value, col = name, linetype = name)) +
-  geom_ribbon(aes(date, ymin = q5_d, ymax = q95_d), fill = wes_cols[3], alpha = .2) +
-  geom_col(aes(date, n_obs / 2)) +
-  ylab("Number Fatalities") +
-  xlab("Date") +
-  coord_cartesian(ylim = c(0, 160)) +
-  theme(
-    legend.background = element_blank(),
-    legend.position = "bottom",
-    legend.title = element_blank(),
-    text = element_text(size = 8, family = "TT Arial"),
-    legend.box.margin = margin(-20, -15, -15, -15),
-    plot.margin = margin(0.1, 0.2, 0.3, 0.1, "cm"),
-    legend.direction = "vertical",
-    legend.spacing = unit(0.01, "mm")
-  ) +
-  scale_color_manual(
-    values = c(med_d = wes_cols[3], n_true_retro = cols[1]),
-    labels = c("RL(ICU)", "True number")
-  ) +
-  scale_x_date(breaks = dates, date_labels = "%y-%m-%d", expand = c(0.02, 0.02)) +
-  scale_linetype_manual(
-    values = c(med_d = 1, n_true_retro = 2),
-    labels = c("RL(ICU)", "True number")
-  )
+snap_res_d <- fig_1day(N_d, fig_col = wes_cols[3], fig_label = "RL(ICU)") +
+  scale_x_date(breaks = dates, date_labels = "%y-%m-%d", expand = c(0.02, 0.02))+
+  coord_cartesian(ylim = c(0, 160))
 
 snap_res_d
 
@@ -389,7 +314,7 @@ q_plot_a_30 <- q_plot %>%
     legend.background = element_blank(),
     legend.position = "bottom",
     legend.title = element_blank(),
-    text = element_text(size = 8, family = "TT Arial"),
+    text = element_text(size = 8, family = "sans"),
     legend.box.margin = margin(-15, -15, -15, -15),
     legend.spacing = unit(0, "cm"),
     legend.text.align = 0,
@@ -466,7 +391,7 @@ q_plot_b_30 <- q_plot %>%
     legend.background = element_blank(),
     legend.position = "bottom",
     legend.title = element_blank(),
-    text = element_text(size = 8, family = "TT Arial"),
+    text = element_text(size = 8, family = "sans"),
     legend.box.margin = margin(-15, -15, -15, -15),
     legend.spacing = unit(0, "cm"),
     legend.text.align = 0,
@@ -547,7 +472,7 @@ q_plot_d_30 <- q_plot_d %>%
     legend.background = element_blank(),
     legend.position = "bottom",
     legend.title = element_blank(),
-    text = element_text(size = 8, family = "TT Arial"),
+    text = element_text(size = 8, family = "sans"),
     legend.box.margin = margin(-15, -15, -15, -15),
     legend.spacing = unit(0, "cm"),
     legend.text.align = 0,
@@ -578,30 +503,33 @@ q_plot_d_30
 fig4 <- ggarrange(snap_res_a, q_plot_a_30, snap_res_b, q_plot_b_30, snap_res_d, q_plot_d_30, nrow = 3, ncol = 2)
 fig4
 ggsave(paste0("./plots/fig4.png"), units = "in", dpi = 300, fig4, height = 6.8, width = 5.2)
-ggsave(paste0("./plots/fig4.tiff"), units = "in", dpi = 300, fig4, height = 6.8, width = 5.2)
+#ggsave(paste0("./plots/fig4.tiff"), units = "in", dpi = 300, fig4, height = 6.8, width = 5.2)
 
 # Fig 5
 err_delay <- read_csv("./results/summarized_results_and_tables/error_by_delay.csv") %>% as.data.frame()
 
-rmse_plot <- err_delay %>% # select(delay, err_a_7, err_d_7, err_b_7) %>%
-  pivot_longer(starts_with("rmse"), names_to = "model", values_to = "rmse") %>%
-  ggplot(aes(x = delay, y = rmse)) +
-  geom_line(aes(color = model, linetype = model)) +
-  ylab("RMSE") +
-  xlab(expression(paste("Days since day ", italic("T")))) +
-  scale_x_continuous(breaks = 0:7 * 5, expand = c(0.02, 0.02)) +
-  theme(
-    legend.background = element_blank(),
-    legend.position = "bottom",
-    legend.title = element_blank(),
-    text = element_text(size = 8, family = "TT Arial"),
-    legend.box.margin = margin(-15, -15, -15, -15),
-    plot.margin = margin(0.1, 0.1, 0.5, 0, "cm")
-  ) +
+error_plot <- function(table, plot_error = "rmse", plot_label = "RMSE"){
+  err_delay %>% 
+    pivot_longer(starts_with(plot_error), names_to = "model", values_to = plot_error) %>%
+    ggplot(aes(x = delay, y = rmse)) +
+    geom_line(aes(color = model, linetype = model)) +
+    ylab(plot_label) +
+    xlab(expression(paste("Days since day ", italic("T")))) +
+    scale_x_continuous(breaks = 0:7 * 5, expand = c(0.02, 0.02)) +
+    theme(
+      legend.background = element_blank(),
+      legend.position = "bottom",
+      legend.title = element_blank(),
+      text = element_text(size = 8, family = "sans"),
+      legend.box.margin = margin(-15, -15, -15, -15),
+      plot.margin = margin(0.1, 0.1, 0.5, 0, "cm")
+    ) 
+}
+rmse_plot <-  error_plot(err_delay, plot_error = "rmse", plot_label = "RMSE") +
   scale_color_manual(
-    values = c(cols[4], cols[2], wes_cols[3]),
-    labels = c(rmse_a = "R", rmse_d = "RL(ICU)", rmse_b = "L(ICU)")
-  ) +
+  values = c(cols[4], cols[2], wes_cols[3]),
+  labels = c(rmse_a = "R", rmse_d = "RL(ICU)", rmse_b = "L(ICU)")
+) +
   scale_linetype_manual(
     values = c(1, 3, 2),
     labels = c(rmse_a = "R", rmse_d = "RL(ICU)", rmse_b = "L(ICU)")
@@ -609,21 +537,7 @@ rmse_plot <- err_delay %>% # select(delay, err_a_7, err_d_7, err_b_7) %>%
 
 rmse_plot
 
-log_plot <- err_delay %>% # select(delay, err_a_7, err_d_7, err_b_7) %>%
-  pivot_longer(starts_with("log"), names_to = "model", values_to = "log") %>%
-  ggplot(aes(x = delay, y = log)) +
-  geom_line(aes(color = model, linetype = model)) +
-  ylab("logS") +
-  xlab(expression(paste("Days since day ", italic("T")))) +
-  scale_x_continuous(breaks = 0:7 * 5, expand = c(0.02, 0.02)) +
-  theme(
-    legend.background = element_blank(),
-    legend.position = "bottom",
-    legend.title = element_blank(),
-    text = element_text(size = 8, family = "TT Arial"),
-    legend.box.margin = margin(-15, -15, -15, -15),
-    plot.margin = margin(0.1, 0.1, 0.5, 0, "cm")
-  ) +
+log_plot <- error_plot(err_delay, plot_error = "logs", plot_label = "logS")+
   scale_color_manual(
     values = c(cols[4], cols[2], wes_cols[3]),
     labels = c(logs_a = "R", logs_d = "RL(ICU)", logs_b = "L(ICU)")
@@ -636,21 +550,7 @@ log_plot <- err_delay %>% # select(delay, err_a_7, err_d_7, err_b_7) %>%
 log_plot
 
 
-crps_plot <- err_delay %>% # select(delay, err_a_7, err_d_7, err_b_7) %>%
-  pivot_longer(starts_with("crps"), names_to = "model", values_to = "crps") %>%
-  ggplot(aes(x = delay, y = crps)) +
-  geom_line(aes(color = model, linetype = model)) +
-  ylab("CRPS") +
-  xlab(expression(paste("Days since day ", italic("T")))) +
-  scale_x_continuous(breaks = 0:7 * 5, expand = c(0.02, 0.02)) +
-  theme(
-    legend.background = element_blank(),
-    legend.position = "bottom",
-    legend.title = element_blank(),
-    text = element_text(size = 8, family = "TT Arial"),
-    legend.box.margin = margin(-15, -15, -15, -15),
-    plot.margin = margin(0.1, 0.1, 0.5, 0, "cm")
-  ) +
+crps_plot <- error_plot(err_delay, "crps", "CRPS") +
   scale_color_manual(
     values = c(cols[4], cols[2], wes_cols[3]),
     labels = c(crps_a = "R", crps_d = "RL(ICU)", crps_b = "L(ICU)")
@@ -668,7 +568,7 @@ fig5 <- crps_plot + log_plot +
   plot_layout(guides = "collect", ncol = 3) & theme(
     legend.position = "bottom",
     plot.margin = margin(0.1, 0.1, 0.1, 0.1, "cm"),
-    text = element_text(size = 8, family = "TT Arial"),
+    text = element_text(size = 8, family = "sans"),
     legend.box.margin = margin(-15, -15, -15, -15)
   )
 
@@ -691,7 +591,7 @@ rep_plot_a <- res_df %>%
     legend.background = element_blank(),
     legend.position = "bottom",
     legend.title = element_blank(),
-    text = element_text(size = 8, family = "TT Arial"),
+    text = element_text(size = 8, family = "sans"),
     legend.box.margin = margin(-15, -15, -15, -15)
   ) +
   scale_color_manual(
@@ -721,7 +621,7 @@ rep_plot_b <- res_df %>%
     legend.background = element_blank(),
     legend.position = "bottom",
     legend.title = element_blank(),
-    text = element_text(size = 8, family = "TT Arial"),
+    text = element_text(size = 8, family = "sans"),
     legend.box.margin = margin(-15, -15, -15, -15)
   ) +
   scale_color_manual(
@@ -750,7 +650,7 @@ rep_plot_d <- res_df %>%
     legend.background = element_blank(),
     legend.position = "bottom",
     legend.title = element_blank(),
-    text = element_text(size = 8, family = "TT Arial"),
+    text = element_text(size = 8, family = "sans"),
     legend.box.margin = margin(-15, -15, -15, -15)
   ) +
   scale_color_manual(
@@ -768,7 +668,7 @@ fig6 <- rep_plot_a + rep_plot_b + rep_plot_d +
   plot_layout(ncol = 1) & theme(
   legend.position = "bottom",
   plot.margin = margin(0.1, 0.1, 0.2, 0.1, "cm"),
-  text = element_text(size = 8, family = "TT Arial"),
+  text = element_text(size = 8, family = "sans"),
   legend.box.margin = margin(-15, -15, -15, -15)
 )
 fig6
@@ -793,7 +693,7 @@ log_plot_7 <- res_df %>%
     legend.background = element_blank(),
     legend.position = "bottom",
     legend.title = element_blank(),
-    text = element_text(size = 8, family = "TT Arial"),
+    text = element_text(size = 8, family = "sans"),
     legend.box.margin = margin(-15, -15, -15, -15),
     plot.margin = margin(0.1, 0.1, 0, 0, "cm")
   ) +
@@ -824,7 +724,7 @@ crps_plot_7 <- res_df %>%
     legend.background = element_blank(),
     legend.position = "bottom",
     legend.title = element_blank(),
-    text = element_text(size = 8, family = "TT Arial"),
+    text = element_text(size = 8, family = "sans"),
     legend.box.margin = margin(-15, -15, -15, -15),
     plot.margin = margin(0.1, 0.1, 0, 0, "cm")
   ) +
@@ -843,7 +743,7 @@ fig7 <- log_plot_7 + crps_plot_7 + plot_annotation(tag_levels = c("A", "B")) +
   plot_layout(guides = "collect", ncol = 1) & theme(
   legend.position = "bottom",
   plot.margin = margin(0.1, 0.1, 0.1, 0.1, "cm"),
-  text = element_text(size = 8, family = "TT Arial"),
+  text = element_text(size = 8, family = "sans"),
   legend.box.margin = margin(-15, -15, -15, -15)
 )
 
@@ -903,7 +803,7 @@ p1 <- plot_dat %>% ggplot(aes(x = as.numeric(delay), y = death_date)) +
                     labels = c("Reported", "Occurred but not yet reported")) +
   theme(
     legend.position = "none",
-    text = element_text(size = 8, family = "TT Arial")
+    text = element_text(size = 8, family = "sans")
   ) 
 
 dat_mod <- dat %>% filter(rep_date <= now)
@@ -932,14 +832,16 @@ p2 <- dat %>% group_by(date=death_date) %>%
     legend.background = element_blank(),
     legend.title = element_blank(),
     plot.margin = margin(0, 0, 0, 0, "cm"),
-    text = element_text(size = 8, family = "TT Arial"),
+    text = element_text(size = 8, family = "sans"),
     legend.box.margin = margin(-10, -10, -10, -10)
   ) 
 
 swe_rep <- p1 + p2 + plot_annotation(tag_levels = c("A", "B")) + plot_layout( ncol =1) 
 
+swe_rep
+
 ggsave(paste0("./plots/figS1.png"), units = "in", dpi = 300, swe_rep, height = 5, width = 5.2)
-ggsave(paste0("./plots/figS1.tiff"), units = "in", dpi = 300, swe_rep, height = 4, width = 5.2, compression = "lzw")
+#ggsave(paste0("./plots/figS1.tiff"), units = "in", dpi = 300, swe_rep, height = 4, width = 5.2, compression = "lzw")
 
 
 # Fig S2
@@ -961,7 +863,7 @@ plot_est_a_1230 <- p_1230_a_est %>%
   theme(legend.position = "bottom",
         legend.box = "vertical",
         legend.margin = margin(),
-        text = element_text(size = 8, family = "TT Arial")) +
+        text = element_text(size = 8, family = "sans")) +
   guides(fill = guide_legend(nrow = 1, byrow = TRUE))
 
 plot_est_a_1230
@@ -984,7 +886,7 @@ plot_est_b_1230 <- p_1230_b_est %>%
     legend.position = "bottom",
     legend.box = "vertical",
     legend.margin = margin(),
-    text = element_text(size = 8, family = "TT Arial")
+    text = element_text(size = 8, family = "sans")
     #  legend.title = "element_blank()"
   ) +
   guides(fill = guide_legend(nrow = 1, byrow = TRUE))
@@ -1007,7 +909,7 @@ plot_est_b_1230 <- p_1230_b_est %>%
     legend.position = "bottom",
     legend.box = "vertical",
     legend.margin = margin(),
-    text = element_text(size = 8, family = "TT Arial")
+    text = element_text(size = 8, family = "sans")
     #  legend.title = "element_blank()"
   ) +
   guides(fill = guide_legend(nrow = 1, byrow = TRUE))
@@ -1030,7 +932,7 @@ plot_est_d_1230 <- p_1230_d_est %>%
     legend.position = "bottom",
     legend.box = "vertical",
     legend.margin = margin(),
-    text = element_text(size = 8, family = "TT Arial")
+    text = element_text(size = 8, family = "sans")
   ) +
   guides(fill = guide_legend(nrow = 1, byrow = TRUE))
 
@@ -1051,7 +953,7 @@ plot_emp_1230 <- p_1230_emp %>%
     legend.position = "bottom",
     legend.box = "vertical",
     legend.margin = margin(),
-    text = element_text(size = 8, family = "TT Arial")
+    text = element_text(size = 8, family = "sans")
     #  legend.title = "element_blank()"
   ) +
   guides(fill = guide_legend(nrow = 1, byrow = TRUE))
@@ -1062,7 +964,7 @@ figS1 <- plot_emp_1230 + plot_est_a_1230 +
   plot_layout(guides = "collect", ncol = 2) & theme(
   legend.position = "bottom",
   plot.margin = margin(0.1, 0.2, 0.3, 0.1, "cm"),
-  text = element_text(size = 8, family = "TT Arial"),
+  text = element_text(size = 8, family = "sans"),
   legend.box.margin = margin(-5, -10, -10, -10)
 )
 
@@ -1088,7 +990,7 @@ rep_plot_dc <- res_df %>%
     legend.background = element_blank(),
     legend.position = "bottom",
     legend.title = element_blank(),
-    text = element_text(size = 8, family = "TT Arial"),
+    text = element_text(size = 8, family = "sans"),
     legend.box.margin = margin(-15, -15, -15, -15)
   ) +
   scale_color_manual(
@@ -1117,7 +1019,7 @@ rep_plot_dic <- res_df %>%
     legend.background = element_blank(),
     legend.position = "bottom",
     legend.title = element_blank(),
-    text = element_text(size = 8, family = "TT Arial"),
+    text = element_text(size = 8, family = "sans"),
     legend.box.margin = margin(-15, -15, -15, -15)
   ) +
   scale_color_manual(
@@ -1151,7 +1053,7 @@ beta_0_plot <- res_beta_0 %>%
     legend.background = element_blank(),
     legend.position = "bottom",
     legend.title = element_blank(),
-    text = element_text(size = 8, family = "TT Arial"),
+    text = element_text(size = 8, family = "sans"),
     legend.box.margin = margin(-15, -15, -15, -15)
   ) +
   scale_color_manual(values = c("L(ICU)" = wes_cols[14]))
@@ -1170,7 +1072,7 @@ beta_1_plot <- res_beta_1 %>%
     legend.background = element_blank(),
     legend.position = "bottom",
     legend.title = element_blank(),
-    text = element_text(size = 8, family = "TT Arial"),
+    text = element_text(size = 8, family = "sans"),
     legend.box.margin = margin(-15, -15, -15, -15)
   ) +
   scale_color_manual(values = c("L(ICU)" = wes_cols[13]))
@@ -1179,7 +1081,7 @@ beta_1_plot
 figS3 <- ggarrange(beta_0_plot, beta_1_plot, nrow = 2)
 figS3
 ggsave(paste0("./plots/figS3.png"), units = "in", dpi = 300, figS3, height = 3.9, width = 5.2)
-ggsave(paste0("./plots/figS3.tiff"), units = "in", dpi = 300, figS3, height = 3.9, width = 5.2)
+#ggsave(paste0("./plots/figS3.tiff"), units = "in", dpi = 300, figS3, height = 3.9, width = 5.2)
 
 
 
@@ -1195,119 +1097,19 @@ figS4 <- res_beta_1_d %>%
     legend.background = element_blank(),
     legend.position = "bottom",
     legend.title = element_blank(),
-    text = element_text(size = 8, family = "TT Arial"),
+    text = element_text(size = 8, family = "sans"),
     legend.box.margin = margin(-15, -15, -15, -15)
   ) +
   scale_color_manual(values = c("RL(ICU)" = wes_cols[3]))
 figS4
 
 ggsave("./plots/figS4.png", units = "in", dpi = 300, figS4, height = 2, width = 5.2)
-ggsave("./plots/figS4.tiff", units = "in", dpi = 300, figS4, height = 2, width = 5.2)
-
-
-# Fig SI Appendix S5
-n <- 60
-now <- ymd(rep_dates[n])
-start <- ymd(now - 7 * 8 + 1)
-dat_mod <- dat %>%
-  filter(rep_date <= now)
-
-N_r2 <- lapply(paste0("./results/N/", "N_mod_r2_2020-12-30.csv"), read_csv) %>% as.data.frame()
-post_N_r2 <- tibble(
-  date = seq(now - (55), now, "1 day"),
-  med_r2 = apply(N_r2, 2, median),
-  q5_r2 = apply(N_r2, 2, function(x) quantile(x, .025)),
-  q95_r2 = apply(N_r2, 2, function(x) quantile(x, .975))
-)
-
-snap_res_r <- dat_mod %>%
-  group_by(date = death_date) %>%
-  summarise(n_obs = sum(n)) %>%
-  right_join(tibble(date = seq(start, now, by = "1 day"))) %>%
-  left_join(post_N_a) %>%
-  left_join(dat %>% group_by(date = death_date) %>%
-              summarise(n_true_retro = sum(n))) %>%
-  mutate_if(is.integer, ~ replace(., is.na(.), 0)) %>%
-  filter(date > (now - 36)) %>%
-  pivot_longer(c(med_a, n_true_retro)) %>%
-  ggplot() +
-  geom_line(aes(date, value, color = name, linetype = name)) +
-  geom_ribbon(aes(date, ymin = q5_a, ymax = q95_a), fill = cols[4], alpha = .2) +
-  geom_col(aes(date, n_obs / 2)) +
-  ylab("Number Fatalities") +
-  xlab("Date") +
-  coord_cartesian(ylim = c(0, 230)) +
-  scale_color_manual(
-    values = c(med_a = cols[4], n_true_retro = cols[1]),
-    labels = c("R", "True number")
-  ) +
-  scale_x_date(breaks = dates, date_labels = "%y-%m-%d", expand = c(0.02, 0.02)) +
-  scale_linetype_manual(
-    values = c(med_a = 1, n_true_retro = 2),
-    labels = c("R", "True number")
-  ) +
-  theme(
-    legend.background = element_blank(),
-    legend.position = "bottom",
-    legend.title = element_blank(),
-    text = element_text(size = 8, family = "TT Arial"),
-    legend.box.margin = margin(-20, -15, -15, -15),
-    legend.direction = "vertical",
-    legend.spacing = unit(0.01, "mm"),
-    plot.margin = margin(0.2, 0.2, 0.3, 0.2, "cm")
-  )
-
-
-
-snap_res_r2 <- dat_mod %>%
-  group_by(date = death_date) %>%
-  summarise(n_obs = sum(n)) %>%
-  right_join(tibble(date = seq(start, now, by = "1 day"))) %>%
-  left_join(post_N_r2) %>%
-  left_join(dat %>% group_by(date = death_date) %>%
-              summarise(n_true_retro = sum(n))) %>%
-  mutate_if(is.integer, ~ replace(., is.na(.), 0)) %>%
-  filter(date > (now - 36)) %>%
-  pivot_longer(c(med_r2, n_true_retro)) %>%
-  ggplot() +
-  geom_line(aes(date, value, color = name, linetype = name)) +
-  geom_ribbon(aes(date, ymin = q5_r2, ymax = q95_r2), fill = cols[6], alpha = .2) +
-  geom_col(aes(date, n_obs / 2)) +
-  ylab("Number Fatalities") +
-  xlab("Date") +
-  coord_cartesian(ylim = c(0, 230)) +
-  scale_color_manual(
-    values = c(med_r2 = cols[6], n_true_retro = cols[1]),
-    labels = c("R2", "True number")
-  ) +
-  scale_x_date(breaks = dates, date_labels = "%y-%m-%d", expand = c(0.02, 0.02)) +
-  scale_linetype_manual(
-    values = c(med_r2 = 1, n_true_retro = 2),
-    labels = c("R", "True number")
-  ) +
-  theme(
-    legend.background = element_blank(),
-    legend.position = "bottom",
-    legend.title = element_blank(),
-    text = element_text(size = 8, family = "TT Arial"),
-    legend.box.margin = margin(-20, -15, -15, -15),
-    legend.direction = "vertical",
-    legend.spacing = unit(0.01, "mm"),
-    plot.margin = margin(0.2, 0.2, 0.3, 0.2, "cm")
-  )
-
-plot_s5 <- snap_res_r + snap_res_r2
-plot_s5
-
-ggsave("./plots/S5_fig.png", units = "in", dpi = 300, 
-       plot_s5, height = 1.75, width = 5.2)
-
+#ggsave("./plots/figS4.tiff", units = "in", dpi = 300, figS4, height = 2, width = 5.2)
 
 
 # FigS1 RMSE
 
 # RMSE 7days
-# dates <- c(as.Date("2020-11-01"), as.Date("2021-01-01"), as.Date("2021-03-01"), as.Date("2021-05-01"))
 
 rmse7_plot <- res_df %>%
   select(date, err_a_7, err_d_7, err_b_7) %>%
@@ -1321,7 +1123,7 @@ rmse7_plot <- res_df %>%
     legend.background = element_blank(),
     legend.position = "bottom",
     legend.title = element_blank(),
-    text = element_text(size = 8, family = "TT Arial"),
+    text = element_text(size = 8, family = "sans"),
     legend.box.margin = margin(-15, -15, -15, -15),
     plot.margin = margin(0.1, 0.1, 0.5, 0, "cm")
   ) +
@@ -1337,7 +1139,7 @@ rmse7_plot <- res_df %>%
 rmse7_plot
 
 ggsave(paste0("./plots/S1_fig.png"), units = "in", dpi = 300, rmse7_plot, height = 1.75, width = 5.2)
-ggsave(paste0("./plots/S1_fig.tiff"), units = "in", dpi = 300, rmse7_plot, height = 1.75, width = 5.2)
+#ggsave(paste0("./plots/S1_fig.tiff"), units = "in", dpi = 300, rmse7_plot, height = 1.75, width = 5.2)
 
 
 

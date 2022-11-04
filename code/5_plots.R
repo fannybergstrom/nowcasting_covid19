@@ -13,7 +13,9 @@ res_df <- read_csv("./results/summarized_results_and_tables/results.csv") %>%
 # Plot theme and color
 theme_set(theme_bw())
 cols <- pal_nejm("default", alpha = 1)(8)
-wes_cols <- wes_palette("Darjeeling1", 5) %>% c(wes_palette("FantasticFox1"))
+wes_cols <- c(wes_palette("Darjeeling1", 5),
+              wes_palette("Zissou1", 8, "continuous"),
+              wes_palette("GrandBudapest2"))
 vir_cols <- viridis_pal()(12)
 
 # Figure 1, observed and unreported.
@@ -138,7 +140,7 @@ ggsave(paste0("./plots/fig2.png"), units = "in", dpi = 300, timeseries_plots, he
 # Fig 3 is a Tikz figure
 
 # Fig 4
-
+now
 ## Single reporting day
 fig_1day <- function(N_mod, now = as.Date("2020-12-30"), fig_col = "blue", fig_label = "Model type"){
   post_N <- tibble(
@@ -183,7 +185,7 @@ fig_1day <- function(N_mod, now = as.Date("2020-12-30"), fig_col = "blue", fig_l
       legend.box.margin = margin(-20, -15, -15, -15),
       legend.direction = "vertical",
       legend.spacing = unit(0.01, "mm"),
-      plot.margin = margin(0.1, 0.2, 0.3, 0.1, "cm")
+      plot.margin = margin(0.1, 0.4, 0.2, 0.1, "cm")
     )
 }
 
@@ -213,7 +215,6 @@ snap_res_a <- fig_1day(N_a, fig_col = cols[4], fig_label = "R") +
   scale_x_date(breaks = dates, date_labels = "%y-%m-%d", expand = c(0.02, 0.02))+
   coord_cartesian(ylim = c(0, 160))
 
-
 snap_res_b <- fig_1day(N_b, fig_col = cols[2], fig_label = "L(ICU)") +
   scale_x_date(breaks = dates, date_labels = "%y-%m-%d", expand = c(0.02, 0.02))+
   coord_cartesian(ylim = c(0, 160))
@@ -222,91 +223,13 @@ snap_res_d <- fig_1day(N_d, fig_col = wes_cols[3], fig_label = "RL(ICU)") +
   scale_x_date(breaks = dates, date_labels = "%y-%m-%d", expand = c(0.02, 0.02))+
   coord_cartesian(ylim = c(0, 160))
 
-snap_res_d
 
 # Q-plots
-p_est_a_1230 <- read_csv("./results/p/p_mod_r_ph_2020-12-30.csv")
-p_est_d_1230 <- read_csv("./results/p/p_mod_rl_2020-12-30.csv")
-p_est_b_1230 <- read_csv("./results/p/p_mod_l_2020-12-30.csv")
-
-p_1230_emp <- dat %>%
-  mutate(delay = as.numeric(rep_date - death_date)) %>%
-  filter(death_date >= "2020-11-01", death_date <= "2020-12-30") %>%
-  group_by(death_date, delay) %>%
-  summarise(n = sum(n)) %>%
-  right_join(tibble(expand.grid(
-    death_date = seq(as.Date("2020-11-25"), as.Date("2020-12-30"), "1 day"),
-    delay = 0:500
-  ))) %>%
-  mutate(n = replace_na(n, 0)) %>%
-  arrange(death_date, delay) %>%
-  mutate(frac = n / sum(n), cum_frac = cumsum(frac))
-
-# Quantile plot A
-## Quantile plot
-q50_emp_30 <- p_1230_emp %>%
-  filter(cum_frac >= 0.5) %>%
-  group_by(death_date) %>%
-  filter(delay == min(delay)) %>%
-  select(death_date, q_5_emp = delay)
-
-q05_emp_30 <- p_1230_emp %>%
-  filter(cum_frac >= 0.05) %>%
-  group_by(death_date) %>%
-  filter(delay == min(delay)) %>%
-  select(death_date, q_05_emp = delay)
-
-q95_emp_30 <- p_1230_emp %>%
-  filter(cum_frac >= 0.95) %>%
-  group_by(death_date) %>%
-  filter(delay == min(delay)) %>%
-  select(death_date, q_95_emp = delay)
-
-p_1230_a_est <- p_est_a_1230 %>%
-  pivot_longer(starts_with("p")) %>%
-  group_by(name) %>%
-  summarise(med = mean(value)) %>%
-  mutate(
-    day = as.numeric(sapply(name, function(x) strsplit(x, "\\.")[[1]][2])),
-    delay = as.numeric(sapply(name, function(x) strsplit(x, "\\.")[[1]][3])) - 1
-  ) %>%
-  arrange(day, delay) %>%
-  mutate(death_date = ymd("2020-12-30") - (56 - day)) %>%
-  select(death_date, delay, est_p = med) %>%
-  group_by(death_date) %>%
-  mutate(cum_p = cumsum(est_p))
-
-q50_est_30 <- p_1230_a_est %>%
-  filter(cum_p >= 0.5) %>%
-  group_by(death_date) %>%
-  filter(delay == min(delay)) %>%
-  select(death_date, q_5_est = delay)
-
-q05_est_30 <- p_1230_a_est %>%
-  filter(cum_p >= 0.05) %>%
-  group_by(death_date) %>%
-  filter(delay == min(delay)) %>%
-  select(death_date, q_05 = delay)
-
-q95_est_30 <- p_1230_a_est %>%
-  filter(cum_p >= 0.95) %>%
-  group_by(death_date) %>%
-  filter(delay == min(delay)) %>%
-  select(death_date, q_95 = delay)
-
-q_plot <- q50_emp_30 %>%
-  left_join(q05_emp_30) %>%
-  left_join(q95_emp_30) %>%
-  left_join(q50_est_30) %>%
-  left_join(q05_est_30) %>%
-  left_join(q95_est_30) %>%
-  pivot_longer(c(q_5_emp:q_95)) %>%
-  mutate(name = factor(name, levels = c("q_05", "q_05_emp", "q_5_est", "q_5_emp", "q_95", "q_95_emp")))
-
-q_plot_a_30 <- q_plot %>%
+q_plot <- read_csv("./results/summarized_results_and_tables/q_plot.csv")
+q_plot_a_30 <- q_plot %>% 
+  filter(model == "r") %>% 
   ggplot() +
-  geom_line(aes(x = death_date, y = value, color = name, linetype = name)) +
-  scale_x_date(breaks = dates, date_labels = "%y-%m-%d", expand = c(0.02, 0.02)) +
+  geom_line(aes(x = as.Date(death_date), y = value, color = name, linetype = name)) +
   ylim(0, 35) +
   ylab("Delay (days)") +
   xlab("Date") +
@@ -318,7 +241,8 @@ q_plot_a_30 <- q_plot %>%
     legend.box.margin = margin(-15, -15, -15, -15),
     legend.spacing = unit(0, "cm"),
     legend.text.align = 0,
-    plot.margin = margin(0.1, 0.4, 0.2, 0, "cm")
+    legend.key.width= unit(0.4, 'cm'),
+    plot.margin = margin(0.1, 0.7, 0.2, 0.1, "cm")
   ) +
   scale_color_manual(
     values = c(rep(c(cols[4], cols[1]), 3)),
@@ -333,54 +257,15 @@ q_plot_a_30 <- q_plot %>%
       expression(paste(q[0.05] ~ R, " ")), expression(q[0.05] ~ Emp), expression(paste(q[0.50] ~ R, " ")),
       expression(q[0.50] ~ Emp), expression(paste(q[0.95] ~ R, " ")), expression(q[0.95] ~ Emp)
     )
-  )
+  )+
+  scale_x_date(breaks = dates, date_labels = "%y-%m-%d", expand = c(0.02, 0.02))
 
 q_plot_a_30
 
-# Quantil plot mod L
-p_1230_b_est <- p_est_b_1230 %>%
-  pivot_longer(starts_with("p")) %>%
-  group_by(name) %>%
-  summarise(med = mean(value)) %>%
-  mutate(
-    day = as.numeric(sapply(name, function(x) strsplit(x, "\\.")[[1]][2])),
-    delay = as.numeric(sapply(name, function(x) strsplit(x, "\\.")[[1]][3])) - 1
-  ) %>%
-  arrange(day, delay) %>%
-  mutate(death_date = ymd("2020-12-30") - (56 - day)) %>%
-  select(death_date, delay, est_p = med) %>%
-  group_by(death_date) %>%
-  mutate(cum_p = cumsum(est_p))
+# Quantile plot mod L
 
-q50_est_30 <- p_1230_b_est %>%
-  filter(cum_p >= 0.5) %>%
-  group_by(death_date) %>%
-  filter(delay == min(delay)) %>%
-  select(death_date, q_5_est = delay)
-
-q05_est_30 <- p_1230_b_est %>%
-  filter(cum_p >= 0.05) %>%
-  group_by(death_date) %>%
-  filter(delay == min(delay)) %>%
-  select(death_date, q_05 = delay)
-
-q95_est_30 <- p_1230_b_est %>%
-  filter(cum_p >= 0.95) %>%
-  group_by(death_date) %>%
-  filter(delay == min(delay)) %>%
-  select(death_date, q_95 = delay)
-
-q_plot <- q50_emp_30 %>%
-  left_join(q05_emp_30) %>%
-  left_join(q95_emp_30) %>%
-  left_join(q50_est_30) %>%
-  left_join(q05_est_30) %>%
-  left_join(q95_est_30) %>%
-  pivot_longer(c(q_5_emp:q_95)) %>%
-  mutate(name = factor(name, levels = c("q_05", "q_05_emp", "q_5_est", "q_5_emp", "q_95", "q_95_emp")))
-
-
-q_plot_b_30 <- q_plot %>%
+q_plot_b_30 <-  q_plot %>% 
+  filter(model == "l") %>%
   ggplot() +
   geom_line(aes(x = death_date, y = value, color = name, linetype = name)) +
   scale_x_date(breaks = dates, date_labels = "%y-%m-%d", expand = c(0.02, 0.02)) +
@@ -395,7 +280,8 @@ q_plot_b_30 <- q_plot %>%
     legend.box.margin = margin(-15, -15, -15, -15),
     legend.spacing = unit(0, "cm"),
     legend.text.align = 0,
-    plot.margin = margin(0.1, 0.5, 0.2, 0, "cm")
+    legend.key.width= unit(0.4, 'cm'),
+    plot.margin = margin(0.1, 0.7, 0.2, 0.1, "cm")
   ) +
   scale_color_manual(
     values = c(rep(c(cols[2], cols[1]), 3)),
@@ -417,51 +303,9 @@ q_plot_b_30 <- q_plot %>%
 
 q_plot_b_30
 
-# Quantil plot mod RL
-p_1230_d_est <- p_est_d_1230 %>%
-  pivot_longer(starts_with("p")) %>%
-  group_by(name) %>%
-  summarise(med = mean(value)) %>%
-  mutate(
-    day = as.numeric(sapply(name, function(x) strsplit(x, "\\.")[[1]][2])),
-    delay = as.numeric(sapply(name, function(x) strsplit(x, "\\.")[[1]][3])) - 1
-  ) %>%
-  arrange(day, delay) %>%
-  mutate(death_date = ymd("2020-12-30") - (56 - day)) %>%
-  select(death_date, delay, est_p = med) %>%
-  group_by(death_date) %>%
-  mutate(cum_p = cumsum(est_p))
-
-
-q50_est_30 <- p_1230_d_est %>%
-  filter(cum_p >= 0.5) %>%
-  group_by(death_date) %>%
-  filter(delay == min(delay)) %>%
-  select(death_date, q_5_est = delay)
-
-q05_est_30 <- p_1230_d_est %>%
-  filter(cum_p >= 0.05) %>%
-  group_by(death_date) %>%
-  filter(delay == min(delay)) %>%
-  select(death_date, q_05 = delay)
-
-q95_est_30 <- p_1230_d_est %>%
-  filter(cum_p >= 0.95) %>%
-  group_by(death_date) %>%
-  filter(delay == min(delay)) %>%
-  select(death_date, q_95 = delay)
-
-q_plot_d <- q50_emp_30 %>%
-  left_join(q05_emp_30) %>%
-  left_join(q95_emp_30) %>%
-  left_join(q50_est_30) %>%
-  left_join(q05_est_30) %>%
-  left_join(q95_est_30) %>%
-  pivot_longer(c(q_5_emp:q_95)) %>%
-  mutate(name = factor(name, levels = c("q_05", "q_05_emp", "q_5_est", "q_5_emp", "q_95", "q_95_emp")))
-
-
-q_plot_d_30 <- q_plot_d %>%
+# Quantile plot mod RL
+q_plot_d_30 <-  q_plot %>% 
+  filter(model == "rl") %>% 
   ggplot() +
   geom_line(aes(x = death_date, y = value, color = name, linetype = name)) +
   scale_x_date(breaks = dates, date_labels = "%y-%m-%d", expand = c(0.02, 0.02)) +
@@ -476,31 +320,36 @@ q_plot_d_30 <- q_plot_d %>%
     legend.box.margin = margin(-15, -15, -15, -15),
     legend.spacing = unit(0, "cm"),
     legend.text.align = 0,
-    plot.margin = margin(0.1, 0.7, 0.2, 0, "cm")
+    legend.key.width= unit(0.4, 'cm'),
+    plot.margin = margin(0.1, 0.7, 0.2, 0.1, "cm")
   ) +
   scale_color_manual(
     values = c(rep(c(wes_cols[3], cols[1]), 3)),
-    # breaks = c("q_05", "q_05_emp", "q_5_emp", "q_5_est","q_95", "q_95_emp"),
     labels = c(
       q_05 = expression(paste(q[0.05] ~ RL(ICU))), q_05_emp = expression(paste(q[0.05] ~ Emp, " ")),
-      q_5_est = expression(paste(q[0.50] ~ RL(ICU))), q_5_emp = expression(paste(q[0.50] ~ Emp, " ")),
-      q_95 = expression(paste(q[0.95] ~ RL(ICU))), q_5_emp = expression(paste(q[0.95] ~ Emp, " "))
+      q_5_est = expression(paste(q[0.50] ~Emp)), q_5_emp = expression(paste(q[0.50] ~ RL(ICU), " ")),
+      q_95 = expression(paste(q[0.95] ~ RL(ICU))), q_95_emp = expression(paste(q[0.95] ~ Emp, " "))
     )
   ) +
   scale_linetype_manual(
     values = c(4, 4, 1, 1, 3, 3),
-    # breaks = c("q_05", "q_05_emp", "q_5_emp", "q_5_est","q_95", "q_95_emp"),
     labels = c(
       q_05 = expression(paste(q[0.05] ~ RL(ICU))), q_05_emp = expression(paste(q[0.05] ~ Emp, " ")),
-      q_5_est = expression(paste(q[0.50] ~ RL(ICU))), q_5_emp = expression(paste(q[0.50] ~ Emp, " ")),
-      q_95 = expression(paste(q[0.95] ~ RL(ICU))), q_5_emp = expression(paste(q[0.95] ~ Emp, " "))
+      q_5_est = expression(paste(q[0.50] ~ Emp)), q_5_emp = expression(paste(q[0.50] ~ RL(ICU), " ")),
+      q_95 = expression(paste(q[0.95] ~ RL(ICU))), q_95_emp = expression(paste(q[0.95] ~ Emp, " "))
     )
   )
 
 
 q_plot_d_30
 
-fig4 <- ggarrange(snap_res_a, q_plot_a_30, snap_res_b, q_plot_b_30, snap_res_d, q_plot_d_30, nrow = 3, ncol = 2)
+
+fig4 <- {snap_res_a + q_plot_a_30 + plot_layout(tag_level = 'new')} / 
+        {snap_res_b + q_plot_b_30 + plot_layout(tag_level = 'new')} /
+        {snap_res_d + q_plot_d_30 + plot_layout(tag_level = 'new')} +
+    plot_annotation(tag_levels = c('A', '1')) +
+    plot_layout( ncol = 1)
+
 fig4
 ggsave(paste0("./plots/fig4.png"), units = "in", dpi = 300, fig4, height = 6.8, width = 5.2)
 #ggsave(paste0("./plots/fig4.tiff"), units = "in", dpi = 300, fig4, height = 6.8, width = 5.2)
@@ -613,7 +462,6 @@ rep_plot_d <- res_df %>%
   ggplot(aes(x = date)) +
   geom_line(aes(y = value, color = name, linetype = name)) +
   geom_ribbon(aes(date, ymin = q5_d, ymax = q95_d), fill = wes_cols[3], alpha = .2) +
-   +
   scale_color_manual(
     values = c(wes_cols[3], cols[1]),
     labels = c("RL(ICU)", "True number")
@@ -721,6 +569,7 @@ fig7 <- log_plot_7 + crps_plot_7 + plot_annotation(tag_levels = c("A", "B")) +
   legend.box.margin = margin(-15, -15, -15, -15)
 )
 
+fig7
 ggsave(paste0("./plots/fig7.png"), units = "in", dpi = 300, fig7, height = 3.5, width = 5.2)
 #ggsave(paste0("./plots/fig7.tiff"), units = "in", dpi = 300, fig7, height = 3.5, width = 5.2)
 
@@ -741,8 +590,7 @@ c_trans <- function(a, b, breaks = b$breaks, format = b$format) {
 }
 
 D <- 35
-now <- "2020-12-30" %>% as.Date()
-start <- now -35
+start <- now - D
 
 plot_dat <- dat %>%
   group_by(death_date, rep_date) %>%
@@ -780,11 +628,10 @@ p1 <- plot_dat %>% ggplot(aes(x = as.numeric(delay), y = death_date)) +
     text = element_text(size = 8, family = "sans")
   ) 
 
-dat_mod <- dat %>% filter(rep_date <= now)
-
 p2 <- dat %>% group_by(date=death_date) %>%
   summarise(n_true_retro=n()) %>%
-  left_join(dat_mod %>% group_by(date=death_date) %>%
+  left_join(dat %>% filter(rep_date <= now) %>% 
+              group_by(date=death_date) %>%
               summarise(n_obs=n())) %>%
   mutate_if(is.integer, ~replace(., is.na(.), 0)) %>%
   filter(date >= start, date <= now) %>%
@@ -819,21 +666,23 @@ ggsave(paste0("./plots/figS1.png"), units = "in", dpi = 300, swe_rep, height = 5
 
 
 # Fig S2
+p_plot_df <- read_csv("./results/summarized_results_and_tables/p_plot.csv")
 
-plot_est_a_1230 <- p_1230_a_est %>%
-  filter(delay %in% c(1, 3, 7, 10, 14, 21, 35)) %>%
+plot_est_a_1230 <- p_plot_df %>% 
+  filter(mod == "r",
+         delay %in% c(1, 3, 7, 10, 14, 21, 35)) %>%
   mutate(Delay = factor(delay,
     levels = rev(c(1, 3, 7, 10, 14, 21, 35)),
     labels = rev(c(as.character(c(1, 3, 7, 10, 14, 21)), ">21"))
   )) %>%
   filter(death_date >= "2020-11-25") %>%
   ggplot() +
-  geom_ribbon(aes(death_date, ymax = cum_p, ymin = 0, fill = Delay)) +
-  geom_line(aes(death_date, y = cum_p, group = Delay)) +
+  geom_ribbon(aes(death_date, ymax = cum_frac, ymin = 0, fill = Delay)) +
+  geom_line(aes(death_date, y = cum_frac, group = Delay)) +
   scale_x_date(breaks = dates, date_labels = "%y-%m-%d") +
   ylab("Estimated probability R") +
   xlab("Date") +
-  scale_fill_manual(values = pal) +
+  scale_fill_manual(values = wes_cols[6:13]) +
   theme(legend.position = "bottom",
         legend.box = "vertical",
         legend.margin = margin(),
@@ -842,66 +691,45 @@ plot_est_a_1230 <- p_1230_a_est %>%
 
 plot_est_a_1230
 
-plot_est_b_1230 <- p_1230_b_est %>%
-  filter(delay %in% c(1, 3, 7, 10, 14, 21, 35)) %>%
+plot_est_b_1230 <- p_plot_df %>% 
+  filter(mod == "l",
+         delay %in% c(1, 3, 7, 10, 14, 21, 35)) %>%
   mutate(Delay = factor(delay,
     levels = rev(c(1, 3, 7, 10, 14, 21, 35)),
     labels = rev(c(as.character(c(1, 3, 7, 10, 14, 21)), ">21"))
   )) %>%
   filter(death_date >= "2020-11-25") %>%
   ggplot() +
-  geom_ribbon(aes(death_date, ymax = cum_p, ymin = 0, fill = Delay)) +
-  geom_line(aes(death_date, y = cum_p, group = Delay)) +
+  geom_ribbon(aes(death_date, ymax = cum_frac, ymin = 0, fill = Delay)) +
+  geom_line(aes(death_date, y = cum_frac, group = Delay)) +
   scale_x_date(breaks = dates, date_labels = "%y-%m-%d") +
   ylab("Estimated probability L(ICU)") +
   xlab("Date") +
-  scale_fill_manual(values = pal) +
-  theme( # legend.background = element_blank(),
-    legend.position = "bottom",
+  scale_fill_manual(values = wes_cols[6:13]) +
+  theme(legend.position = "bottom",
     legend.box = "vertical",
     legend.margin = margin(),
     text = element_text(size = 8, family = "sans")
-    #  legend.title = "element_blank()"
   ) +
   guides(fill = guide_legend(nrow = 1, byrow = TRUE))
 
-plot_est_b_1230 <- p_1230_b_est %>%
-  filter(delay %in% c(1, 3, 7, 10, 14, 21, 35)) %>%
+plot_est_b_1230
+
+plot_est_d_1230 <- p_plot_df %>% 
+  filter(mod == "rl",
+         delay %in% c(1, 3, 7, 10, 14, 21, 35)) %>%
   mutate(Delay = factor(delay,
     levels = rev(c(1, 3, 7, 10, 14, 21, 35)),
     labels = rev(c(as.character(c(1, 3, 7, 10, 14, 21)), ">21"))
   )) %>%
   filter(death_date >= "2020-11-25") %>%
   ggplot() +
-  geom_ribbon(aes(death_date, ymax = cum_p, ymin = 0, fill = Delay)) +
-  geom_line(aes(death_date, y = cum_p, group = Delay)) +
-  scale_x_date(breaks = dates, date_labels = "%y-%m-%d") +
-  ylab("Estimated probability L(ICU)") +
-  xlab("Date") +
-  scale_fill_manual(values = pal) +
-  theme( # legend.background = element_blank(),
-    legend.position = "bottom",
-    legend.box = "vertical",
-    legend.margin = margin(),
-    text = element_text(size = 8, family = "sans")
-    #  legend.title = "element_blank()"
-  ) +
-  guides(fill = guide_legend(nrow = 1, byrow = TRUE))
-
-plot_est_d_1230 <- p_1230_d_est %>%
-  filter(delay %in% c(1, 3, 7, 10, 14, 21, 35)) %>%
-  mutate(Delay = factor(delay,
-    levels = rev(c(1, 3, 7, 10, 14, 21, 35)),
-    labels = rev(c(as.character(c(1, 3, 7, 10, 14, 21)), ">21"))
-  )) %>%
-  filter(death_date >= "2020-11-25") %>%
-  ggplot() +
-  geom_ribbon(aes(death_date, ymax = cum_p, ymin = 0, fill = Delay)) +
-  geom_line(aes(death_date, y = cum_p, group = Delay)) +
+  geom_ribbon(aes(death_date, ymax = cum_frac, ymin = 0, fill = Delay)) +
+  geom_line(aes(death_date, y = cum_frac, group = Delay)) +
   scale_x_date(breaks = dates, date_labels = "%y-%m-%d") +
   ylab("Estimated probability RL(ICU)") +
   xlab("Date") +
-  scale_fill_manual(values = pal) +
+  scale_fill_manual(values = wes_cols[6:13]) +
   theme(
     legend.position = "bottom",
     legend.box = "vertical",
@@ -910,8 +738,9 @@ plot_est_d_1230 <- p_1230_d_est %>%
   ) +
   guides(fill = guide_legend(nrow = 1, byrow = TRUE))
 
-plot_emp_1230 <- p_1230_emp %>%
-  filter(delay %in% c(1, 3, 7, 10, 14, 21, 500)) %>%
+plot_emp_1230 <- p_plot_df %>% 
+  filter(mod == "emp",
+         delay %in% c(1, 3, 7, 10, 14, 21, 500)) %>%
   mutate(Delay = factor(delay,
     levels = rev(c(1, 3, 7, 10, 14, 21, 500)),
     labels = rev(c(as.character(c(1, 3, 7, 10, 14, 21)), ">21"))
@@ -922,7 +751,7 @@ plot_emp_1230 <- p_1230_emp %>%
   scale_x_date(breaks = dates, date_labels = "%y-%m-%d") +
   ylab("Empirical probability") +
   xlab("Date") +
-  scale_fill_manual(values = pal) +
+  scale_fill_manual(values = wes_cols[6:13]) +
   theme( # legend.background = element_blank(),
     legend.position = "bottom",
     legend.box = "vertical",
@@ -933,93 +762,30 @@ plot_emp_1230 <- p_1230_emp %>%
   guides(fill = guide_legend(nrow = 1, byrow = TRUE))
 
 
-figS1 <- plot_emp_1230 + plot_est_a_1230 +
+figS2 <- plot_emp_1230 + plot_est_a_1230 +
   plot_est_b_1230 + plot_est_d_1230 +
-  plot_layout(guides = "collect", ncol = 2) & theme(
+  plot_annotation(tag_levels = c("A", "B")) +
+  plot_layout(guides = "collect", ncol = 2) & 
+  theme(
   legend.position = "bottom",
   plot.margin = margin(0.1, 0.2, 0.3, 0.1, "cm"),
   text = element_text(size = 8, family = "sans"),
   legend.box.margin = margin(-5, -10, -10, -10)
-)
+) 
+figS2
 
-
-ggsave(paste0("./plots/figS2.png"), units = "in", dpi = 300, figS1, height = 4, width = 5.2)
+ggsave(paste0("./plots/figS2.png"), units = "in", dpi = 300, figS2, height = 4, width = 5.2)
 #ggsave(paste0("./plots/figS2.tiff"), units = "in", dpi = 300, figS1, height = 4, width = 5.2)
 
 
-# S3
-rep_plot_dc <- res_df %>%
-  ggplot(aes(x = date)) +
-  geom_line(aes(y = med_d_c, color = "RL(Cases)")) +
-  geom_line(aes(y = n_true_retro, color = "True number"), lty = 2) +
-  geom_ribbon(aes(date, ymin = q5_d_c, ymax = q95_d_c), fill = wes_cols[8], alpha = .2) +
-  ylab("Number Fatalities") +
-  xlab("Date") +
-  coord_cartesian(ylim = c(0, 250)) +
-  scale_x_date(
-    date_breaks = "1 month", date_labels = "%y-%m-%d",
-    limits = c(as.Date("2020-10-20"), as.Date("2021-05-21")), expand = c(0.02, 0.02)
-  ) +
-  theme(
-    legend.background = element_blank(),
-    legend.position = "bottom",
-    legend.title = element_blank(),
-    text = element_text(size = 8, family = "sans"),
-    legend.box.margin = margin(-15, -15, -15, -15)
-  ) +
-  scale_color_manual(
-    values = c(wes_cols[8], cols[1]),
-    labels = c("RL(Cases)", "True number")
-  ) +
-  scale_linetype_manual(
-    values = c(1, 2),
-    labels = c("RL(Cases)", "True number")
-  )
-rep_plot_dc
-
-rep_plot_dic <- res_df %>%
-  ggplot(aes(x = date)) +
-  geom_line(aes(y = med_e, color = "RL(ICU, Cases)")) +
-  geom_line(aes(y = n_true_retro, color = "True number"), lty = 2) +
-  geom_ribbon(aes(date, ymin = q5_e, ymax = q95_e), fill = wes_cols[9], alpha = .2) +
-  ylab("Number Fatalities") +
-  xlab("Date") +
-  coord_cartesian(ylim = c(0, 250)) +
-  scale_x_date(
-    date_breaks = "1 month", date_labels = "%y-%m-%d",
-    limits = c(as.Date("2020-10-20"), as.Date("2021-05-21")), expand = c(0.02, 0.02)
-  ) +
-  theme(
-    legend.background = element_blank(),
-    legend.position = "bottom",
-    legend.title = element_blank(),
-    text = element_text(size = 8, family = "sans"),
-    legend.box.margin = margin(-15, -15, -15, -15)
-  ) +
-  scale_color_manual(
-    values = c(wes_cols[9], cols[1]),
-    labels = c("RL(ICU, Cases)", "True number")
-  ) +
-  scale_linetype_manual(
-    values = c(1, 2),
-    labels = c("RL(ICU, Cases)", "True number")
-  )
-rep_plot_dic
-
-figS3 <- ggarrange(rep_plot_dc, rep_plot_dic, nrow = 2)
-figS3
-ggsave(paste0("./plots/figS3.png"), units = "in", dpi = 300, figS2, height = 3.9, width = 5.2)
-#ggsave(paste0("./plots/figS3.tiff"), units = "in", dpi = 300, figS2, height = 3.9, width = 5.2)
-
 # Fig S3 (beta)
-
 
 # Beta 0
 res_beta_0 <- read_csv("./results/summarized_results_and_tables/results_beta_0.csv") %>% filter(date >= "2020-10-15", date <= "2021-05-14")
 beta_0_plot <- res_beta_0 %>%
   ggplot(aes(x = date)) +
   geom_line(aes(y = med_b, color = "L(ICU)")) +
-  geom_ribbon(aes(date, ymin = q5_b, ymax = q95_b), fill = wes_cols[14], alpha = .2) +
+  geom_ribbon(aes(date, ymin = q5_b, ymax = q95_b), fill = wes_cols[12], alpha = .2) +
   ylab(expression(beta[0])) +
   xlab("Date") +
   scale_x_date(date_breaks = "1 month", date_labels = "%y-%m-%d", expand = c(0.02, 0.02)) +
@@ -1030,12 +796,12 @@ beta_0_plot <- res_beta_0 %>%
     text = element_text(size = 8, family = "sans"),
     legend.box.margin = margin(-15, -15, -15, -15)
   ) +
-  scale_color_manual(values = c("L(ICU)" = wes_cols[14]))
+  scale_color_manual(values = c("L(ICU)" = wes_cols[12]))
 beta_0_plot
 
-# Beta 1
+# Beta 1 mod b
 res_beta_1 <- read_csv("./results/summarized_results_and_tables/results_beta_1_mod_b.csv") %>% filter(date >= "2020-10-15", date <= "2021-05-14")
-beta_1_plot <- res_beta_1 %>%
+beta_1_b_plot <- res_beta_1 %>%
   ggplot(aes(x = date)) +
   geom_line(aes(y = med_b, color = "L(ICU)")) +
   geom_ribbon(aes(date, ymin = q5_b, ymax = q95_b), fill = wes_cols[13], alpha = .2) +
@@ -1050,9 +816,32 @@ beta_1_plot <- res_beta_1 %>%
     legend.box.margin = margin(-15, -15, -15, -15)
   ) +
   scale_color_manual(values = c("L(ICU)" = wes_cols[13]))
-beta_1_plot
+beta_1_b_plot
 
-figS3 <- ggarrange(beta_0_plot, beta_1_plot, nrow = 2)
+
+# Beta 1 mod b
+res_beta_1_d <- read_csv("./results/summarized_results_and_tables/results_beta_1_mod_d.csv") %>% filter(date >= "2020-10-15", date <= "2021-05-14")
+beta_1_d_plot <- res_beta_1_d %>%
+  ggplot(aes(x = date)) +
+  geom_line(aes(y = med_d, color = "RL(ICU)")) +
+  geom_ribbon(aes(date, ymin = q5_d, ymax = q95_d), fill = wes_cols[13], alpha = .2) +
+  ylab(expression(beta[1])) +
+  xlab("Date") +
+  scale_x_date(date_breaks = "1 month", date_labels = "%y-%m-%d", expand = c(0.02, 0.02)) +
+  theme(
+    legend.background = element_blank(),
+    legend.position = "bottom",
+    legend.title = element_blank(),
+    text = element_text(size = 8, family = "sans"),
+    legend.box.margin = margin(-15, -15, -15, -15)
+  ) +
+  scale_color_manual(values = c("L(ICU)" = wes_cols[13]))
+beta_1_d_plot
+
+
+figS3 <- beta_0_plot + beta_1_b_plot + beta_1_d_plot +
+  plot_annotation( "A", "B", "C") +
+  plot_layout( ncol = 1)
 figS3
 ggsave(paste0("./plots/figS3.png"), units = "in", dpi = 300, figS3, height = 3.9, width = 5.2)
 #ggsave(paste0("./plots/figS3.tiff"), units = "in", dpi = 300, figS3, height = 3.9, width = 5.2)
@@ -1079,6 +868,73 @@ figS4
 
 ggsave("./plots/figS4.png", units = "in", dpi = 300, figS4, height = 2, width = 5.2)
 #ggsave("./plots/figS4.tiff", units = "in", dpi = 300, figS4, height = 2, width = 5.2)
+
+
+# S4 Plots of alternative leading indcators
+rep_plot_dc <- res_df %>%
+  ggplot(aes(x = date)) +
+  geom_line(aes(y = med_d_c, color = "RL(Cases)")) +
+  geom_line(aes(y = n_true_retro, color = "True number"), lty = 2) +
+  geom_ribbon(aes(date, ymin = q5_d_c, ymax = q95_d_c), fill = wes_cols[16], alpha = .2) +
+  ylab("Number Fatalities") +
+  xlab("Date") +
+  coord_cartesian(ylim = c(0, 250)) +
+  scale_x_date(
+    date_breaks = "1 month", date_labels = "%y-%m-%d",
+    limits = c(as.Date("2020-10-20"), as.Date("2021-05-21")), expand = c(0.02, 0.02)
+  ) +
+  theme(
+    legend.background = element_blank(),
+    legend.position = "bottom",
+    legend.title = element_blank(),
+    text = element_text(size = 8, family = "sans"),
+    legend.box.margin = margin(-15, -15, -15, -15)
+  ) +
+  scale_color_manual(
+    values = c(wes_cols[16], cols[1]),
+    labels = c("RL(Cases)", "True number")
+  ) +
+  scale_linetype_manual(
+    values = c(1, 2),
+    labels = c("RL(Cases)", "True number")
+  )
+rep_plot_dc
+
+rep_plot_dic <- res_df %>%
+  ggplot(aes(x = date)) +
+  geom_line(aes(y = med_e, color = "RL(ICU, Cases)")) +
+  geom_line(aes(y = n_true_retro, color = "True number"), lty = 2) +
+  geom_ribbon(aes(date, ymin = q5_e, ymax = q95_e), fill = wes_cols[17], alpha = .2) +
+  ylab("Number Fatalities") +
+  xlab("Date") +
+  coord_cartesian(ylim = c(0, 250)) +
+  scale_x_date(
+    date_breaks = "1 month", date_labels = "%y-%m-%d",
+    limits = c(as.Date("2020-10-20"), as.Date("2021-05-21")), expand = c(0.02, 0.02)
+  ) +
+  theme(
+    legend.background = element_blank(),
+    legend.position = "bottom",
+    legend.title = element_blank(),
+    text = element_text(size = 8, family = "sans"),
+    legend.box.margin = margin(-15, -15, -15, -15)
+  ) +
+  scale_color_manual(
+    values = c(wes_cols[17], cols[1]),
+    labels = c("RL(ICU, Cases)", "True number")
+  ) +
+  scale_linetype_manual(
+    values = c(1, 2),
+    labels = c("RL(ICU, Cases)", "True number")
+  )
+rep_plot_dic
+
+figS4 <- rep_plot_dc + rep_plot_dic +
+  plot_annotation(tag_levels = "A") +
+  plot_layout( ncol = 1)
+figS4
+ggsave(paste0("./plots/figS4.png"), units = "in", dpi = 300, figS2, height = 3.9, width = 5.2)
+#ggsave(paste0("./plots/figS4.tiff"), units = "in", dpi = 300, figS2, height = 3.9, width = 5.2)
 
 
 # FigS1 RMSE

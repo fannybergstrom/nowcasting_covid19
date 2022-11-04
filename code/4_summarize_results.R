@@ -250,3 +250,145 @@ T_s3 <- bind_cols(
 
 # Write table
 write_csv(T_s3, "./results/summarized_results_and_tables/tableS3.csv")
+
+
+## Empirical reporting probability and quantiles
+
+# Functuin for quantiles 
+rep_quant <- function(p_df, q = 0.5){
+  p_df %>%
+    filter(cum_frac >= q) %>%
+    group_by(death_date) %>%
+    filter(delay == min(delay))
+}
+
+# Import model estimates
+p_est_a_1230 <- read_csv("./results/p/p_mod_a_ph_2020-12-30.csv")
+p_est_d_1230 <- read_csv("./results/p/p_mod_b_cp_2020-12-30.csv")
+p_est_b_1230 <- read_csv("./results/p/p_mod_d_new2_2020-12-30.csv")
+
+# Emprical quantiles from observed data
+p_1230_emp <- dat %>%
+  mutate(delay = as.numeric(rep_date - death_date)) %>%
+  filter(death_date >= "2020-11-01", death_date <= "2020-12-30") %>%
+  group_by(death_date, delay) %>%
+  summarise(n = sum(n)) %>%
+  right_join(tibble(expand.grid(
+    death_date = seq(as.Date("2020-11-25"), as.Date("2020-12-30"), "1 day"),
+    delay = 0:500
+  ))) %>%
+  mutate(n = replace_na(n, 0)) %>%
+  arrange(death_date, delay) %>%
+  mutate(frac = n / sum(n), cum_frac = cumsum(frac))
+
+q50_emp <- rep_quant(p_1230_emp, 0.5) %>% 
+  select(death_date, q_5_emp = delay)
+
+q05_emp <- rep_quant(p_1230_emp, 0.05)  %>%
+  select(death_date, q_05_emp = delay)
+
+q95_emp <- rep_quant(p_1230_emp, 0.95) %>%
+  select(death_date, q_95_emp = delay)
+
+
+# Estimated reporting probability
+est_rep_prob <- function(p_df, mod = "Model"){
+  p_est <- p_df %>%
+    pivot_longer(starts_with("p")) %>%
+    group_by(name) %>%
+    summarise(med = mean(value)) %>%
+    mutate(
+      day = as.numeric(sapply(name, function(x) strsplit(x, "\\.")[[1]][2])),
+      delay = as.numeric(sapply(name, function(x) strsplit(x, "\\.")[[1]][3])) - 1
+    ) %>%
+    arrange(day, delay) %>%
+    mutate(death_date = ymd("2020-12-30") - (56 - day)) %>%
+    select(death_date, delay, est_p = med) %>%
+    group_by(death_date) %>%
+    mutate(cum_frac = cumsum(est_p))
+  
+  q50_est <- rep_quant(p_est, 0.5) %>%
+    select(death_date, q_5_est = delay)
+  
+  q05_est <- rep_quant(p_est, 0.05) %>% 
+    select(death_date, q_05 = delay)
+  
+  q95_est <- rep_quant(p_est, 0.95) %>% 
+    select(death_date, q_95 = delay)
+  
+  q50_emp %>%
+    left_join(q05_emp) %>%
+    left_join(q95_emp) %>%
+    left_join(q50_est) %>%
+    left_join(q05_est) %>%
+    left_join(q95_est) %>%
+    pivot_longer(c(q_5_emp:q_95)) %>%
+    mutate(name = factor(name, levels = c("q_05", "q_05_emp", "q_5_est", "q_5_emp", "q_95", "q_95_emp")),
+           model = mod)
+  
+}
+
+# Combine results
+q_plot_df <- bind_rows(est_rep_prob(p_est_a_1230, "r"),
+                        est_rep_prob(p_est_b_1230, "l"), 
+                        est_rep_prob(p_est_d_1230, "rl"))
+# Save results
+write_csv(q_plot_df, "./results/summarized_results_and_tables/q_plot.csv")
+
+
+## Empirical probability plot 
+
+bind_rows(
+  p_est_a_1230 %>%
+    pivot_longer(starts_with("p")) %>%
+    group_by(name) %>%
+    summarise(med = mean(value)) %>%
+    mutate(
+      day = as.numeric(sapply(name, function(x) strsplit(x, "\\.")[[1]][2])),
+      delay = as.numeric(sapply(name, function(x) strsplit(x, "\\.")[[1]][3])) - 1
+    ) %>%
+    arrange(day, delay) %>%
+    mutate(death_date = ymd("2020-12-30") - (56 - day)) %>%
+    select(death_date, delay, est_p = med) %>%
+    group_by(death_date) %>%
+    mutate(cum_frac = cumsum(est_p)) %>% mutate(mod = "r"),
+  p_est_b_1230 %>%
+    pivot_longer(starts_with("p")) %>%
+    group_by(name) %>%
+    summarise(med = mean(value)) %>%
+    mutate(
+      day = as.numeric(sapply(name, function(x) strsplit(x, "\\.")[[1]][2])),
+      delay = as.numeric(sapply(name, function(x) strsplit(x, "\\.")[[1]][3])) - 1
+    ) %>%
+    arrange(day, delay) %>%
+    mutate(death_date = ymd("2020-12-30") - (56 - day)) %>%
+    select(death_date, delay, est_p = med) %>%
+    group_by(death_date) %>%
+    mutate(cum_frac = cumsum(est_p)) %>% mutate(mod = "l"),
+  p_est_d_1230 %>%
+    pivot_longer(starts_with("p")) %>%
+    group_by(name) %>%
+    summarise(med = mean(value)) %>%
+    mutate(
+      day = as.numeric(sapply(name, function(x) strsplit(x, "\\.")[[1]][2])),
+      delay = as.numeric(sapply(name, function(x) strsplit(x, "\\.")[[1]][3])) - 1
+    ) %>%
+    arrange(day, delay) %>%
+    mutate(death_date = ymd("2020-12-30") - (56 - day)) %>%
+    select(death_date, delay, est_p = med) %>%
+    group_by(death_date) %>%
+    mutate(cum_frac = cumsum(est_p)) %>% mutate(mod = "rl"),
+  dat %>%
+    mutate(delay = as.numeric(rep_date - death_date)) %>%
+    filter(death_date >= "2020-11-01", death_date <= "2020-12-30") %>%
+    group_by(death_date, delay) %>%
+    summarise(n = sum(n)) %>%
+    right_join(tibble(expand.grid(
+      death_date = seq(as.Date("2020-11-25"), as.Date("2020-12-30"), "1 day"),
+      delay = 0:500
+    ))) %>%
+    mutate(n = replace_na(n, 0)) %>%
+    arrange(death_date, delay) %>%
+    mutate(frac = n / sum(n), cum_frac = cumsum(frac)) %>% 
+    select(death_date, delay, est_p = frac, cum_frac) 
+)  %>% write_csv("./results/summarized_results_and_tables/p_plot.csv")  

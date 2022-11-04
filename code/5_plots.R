@@ -203,9 +203,9 @@ start <- ymd(now - 7 * 8 + 1)
 path <- "./results/N/N_mod_"
 
 # Import data
-N_a <- lapply(paste0(path,"r", now ".csv"), read_csv) %>% as.data.frame()
-N_b <- lapply(paste0("./results/N/", "N_mod_l_2020-12-30.csv"), read_csv) %>% as.data.frame()
-N_d <- lapply(paste0("./results/N/", "N_mod_rl_2020-12-30.csv"), read_csv) %>% as.data.frame()
+N_a <- lapply(str_c(path,"r_", now, ".csv"), read_csv) %>% as.data.frame()
+N_b <- lapply(str_c(path,"l_", now, ".csv"), read_csv) %>% as.data.frame()
+N_d <- lapply(str_c(path,"rl_", now, ".csv"), read_csv) %>% as.data.frame()
 
 dates <- c(seq(as.IDate("2020-11-25"), as.IDate("2020-12-30"), 12), as.Date("2020-12-30"))
 
@@ -510,8 +510,8 @@ err_delay <- read_csv("./results/summarized_results_and_tables/error_by_delay.cs
 
 error_plot <- function(table, plot_error = "rmse", plot_label = "RMSE"){
   err_delay %>% 
-    pivot_longer(starts_with(plot_error), names_to = "model", values_to = plot_error) %>%
-    ggplot(aes(x = delay, y = rmse)) +
+    pivot_longer(starts_with(plot_error), names_to = "model", values_to = "error") %>%
+    ggplot(aes(x = delay, y = error)) +
     geom_line(aes(color = model, linetype = model)) +
     ylab(plot_label) +
     xlab(expression(paste("Days since day ", italic("T")))) +
@@ -583,17 +583,6 @@ rep_plot_a <- res_df %>%
   ggplot(aes(x = date)) +
   geom_line(aes(y = value, color = name, linetype = name)) +
   geom_ribbon(aes(date, ymin = q5_a, ymax = q95_a), fill = cols[4], alpha = .2) +
-  ylab("Number Fatalities") +
-  xlab("Date") +
-  scale_x_date(date_breaks = "1 month", date_labels = "%y-%m-%d", expand = c(0.02, 0.02)) +
-  coord_cartesian(ylim = c(0, 250)) +
-  theme(
-    legend.background = element_blank(),
-    legend.position = "bottom",
-    legend.title = element_blank(),
-    text = element_text(size = 8, family = "sans"),
-    legend.box.margin = margin(-15, -15, -15, -15)
-  ) +
   scale_color_manual(
     values = c(cols[4], cols[1]),
     labels = c("R", "True number")
@@ -609,21 +598,6 @@ rep_plot_b <- res_df %>%
   ggplot(aes(x = date)) +
   geom_line(aes(y = value, color = name, linetype = name)) +
   geom_ribbon(aes(date, ymin = q5_b, ymax = q95_b), fill = cols[2], alpha = .2) +
-  ylab("Number Fatalities") +
-  xlab("Date") +
-  coord_cartesian(ylim = c(0, 250)) +
-  scale_x_date(
-    date_breaks = "1 month",
-    date_labels = "%y-%m-%d",
-    expand = c(0.02, 0.02)
-  ) +
-  theme(
-    legend.background = element_blank(),
-    legend.position = "bottom",
-    legend.title = element_blank(),
-    text = element_text(size = 8, family = "sans"),
-    legend.box.margin = margin(-15, -15, -15, -15)
-  ) +
   scale_color_manual(
     values = c(med_b = cols[2], n_true_retro = cols[1]),
     labels = c("L(ICU)", "True number")
@@ -639,20 +613,7 @@ rep_plot_d <- res_df %>%
   ggplot(aes(x = date)) +
   geom_line(aes(y = value, color = name, linetype = name)) +
   geom_ribbon(aes(date, ymin = q5_d, ymax = q95_d), fill = wes_cols[3], alpha = .2) +
-  ylab("Number Fatalities") +
-  xlab("Date") +
-  coord_cartesian(ylim = c(0, 250)) +
-  scale_x_date(
-    date_breaks = "1 month", date_labels = "%y-%m-%d",
-    limits = c(as.Date("2020-10-20"), as.Date("2021-05-21")), expand = c(0.02, 0.02)
-  ) +
-  theme(
-    legend.background = element_blank(),
-    legend.position = "bottom",
-    legend.title = element_blank(),
-    text = element_text(size = 8, family = "sans"),
-    legend.box.margin = margin(-15, -15, -15, -15)
-  ) +
+   +
   scale_color_manual(
     values = c(wes_cols[3], cols[1]),
     labels = c("RL(ICU)", "True number")
@@ -661,16 +622,29 @@ rep_plot_d <- res_df %>%
     values = c(1, 2),
     labels = c("RL(ICU)", "True number")
   )
+
 rep_plot_d
 
 fig6 <- rep_plot_a + rep_plot_b + rep_plot_d +
   plot_annotation(tag_levels = c("A", "B")) +
-  plot_layout(ncol = 1) & theme(
-  legend.position = "bottom",
-  plot.margin = margin(0.1, 0.1, 0.2, 0.1, "cm"),
-  text = element_text(size = 8, family = "sans"),
-  legend.box.margin = margin(-15, -15, -15, -15)
-)
+  plot_layout(ncol = 1) & 
+  ylab("Number Fatalities") &
+  xlab("Date") &
+  coord_cartesian(ylim = c(0, 250)) &
+  scale_x_date(
+    date_breaks = "1 month", date_labels = "%y-%m-%d",
+    limits = c(as.Date("2020-10-20"), as.Date("2021-05-21")), expand = c(0.02, 0.02)
+  ) &
+  theme(
+    legend.position = "bottom",
+    plot.margin = margin(0.1, 0.1, 0.2, 0.1, "cm"),
+    text = element_text(size = 8, family = "sans"),
+    legend.box.margin = margin(-15, -15, -15, -15),
+    legend.background = element_blank(),
+    legend.title = element_blank()
+  ) 
+
+
 fig6
 ggsave(paste0("./plots/fig6.png"), units = "in", dpi = 300, fig6, height = 5.8, width = 5.2)
 #ggsave(paste0("./plots/fig6.tiff"), units = "in", dpi = 300, fig6, height = 5.8, width = 5.2)

@@ -844,7 +844,7 @@ figS3 <- beta_0_plot + beta_1_b_plot + beta_1_d_plot +
   plot_annotation(tag_levels = "A") +
   plot_layout( ncol = 1)
 figS3
-ggsave(paste0("./plots/figS3.png"), units = "in", dpi = 300, figS3, height = 3.9, width = 5.2)
+ggsave(paste0("./plots/figS3.png"), units = "in", dpi = 300, figS3, height = 5.8, width = 5.2)
 #ggsave(paste0("./plots/figS3.tiff"), units = "in", dpi = 300, figS3, height = 3.9, width = 5.2)
 
 

@@ -15,7 +15,8 @@ theme_set(theme_bw())
 cols <- pal_nejm("default", alpha = 1)(8)
 wes_cols <- c(wes_palette("Darjeeling1", 5),
               wes_palette("Zissou1", 8, "continuous"),
-              wes_palette("GrandBudapest2"))
+              wes_palette("GrandBudapest2"),
+              wes_palette("GrandBudapest1"))
 vir_cols <- viridis_pal()(12)
 
 # Figure 1, observed and unreported.
@@ -785,7 +786,7 @@ res_beta_0 <- read_csv("./results/summarized_results_and_tables/results_beta_0.c
 beta_0_plot <- res_beta_0 %>%
   ggplot(aes(x = date)) +
   geom_line(aes(y = med_b, color = "L(ICU)")) +
-  geom_ribbon(aes(date, ymin = q5_b, ymax = q95_b), fill = wes_cols[12], alpha = .2) +
+  geom_ribbon(aes(date, ymin = q5_b, ymax = q95_b), fill = wes_cols[21], alpha = .2) +
   ylab(expression(beta[0])) +
   xlab("Date") +
   scale_x_date(date_breaks = "1 month", date_labels = "%y-%m-%d", expand = c(0.02, 0.02)) +
@@ -796,7 +797,7 @@ beta_0_plot <- res_beta_0 %>%
     text = element_text(size = 8, family = "sans"),
     legend.box.margin = margin(-15, -15, -15, -15)
   ) +
-  scale_color_manual(values = c("L(ICU)" = wes_cols[12]))
+  scale_color_manual(values = c("L(ICU)" = wes_cols[21]))
 beta_0_plot
 
 # Beta 1 mod b
@@ -804,7 +805,7 @@ res_beta_1 <- read_csv("./results/summarized_results_and_tables/results_beta_1_m
 beta_1_b_plot <- res_beta_1 %>%
   ggplot(aes(x = date)) +
   geom_line(aes(y = med_b, color = "L(ICU)")) +
-  geom_ribbon(aes(date, ymin = q5_b, ymax = q95_b), fill = wes_cols[13], alpha = .2) +
+  geom_ribbon(aes(date, ymin = q5_b, ymax = q95_b), fill = wes_cols[8], alpha = .2) +
   ylab(expression(beta[1])) +
   xlab("Date") +
   scale_x_date(date_breaks = "1 month", date_labels = "%y-%m-%d", expand = c(0.02, 0.02)) +
@@ -815,16 +816,16 @@ beta_1_b_plot <- res_beta_1 %>%
     text = element_text(size = 8, family = "sans"),
     legend.box.margin = margin(-15, -15, -15, -15)
   ) +
-  scale_color_manual(values = c("L(ICU)" = wes_cols[13]))
+  scale_color_manual(values = c("L(ICU)" = wes_cols[8]))
 beta_1_b_plot
 
 
-# Beta 1 mod b
+# Beta 1 mod d
 res_beta_1_d <- read_csv("./results/summarized_results_and_tables/results_beta_1_mod_d.csv") %>% filter(date >= "2020-10-15", date <= "2021-05-14")
 beta_1_d_plot <- res_beta_1_d %>%
   ggplot(aes(x = date)) +
   geom_line(aes(y = med_d, color = "RL(ICU)")) +
-  geom_ribbon(aes(date, ymin = q5_d, ymax = q95_d), fill = wes_cols[13], alpha = .2) +
+  geom_ribbon(aes(date, ymin = q5_d, ymax = q95_d), fill = wes_cols[10], alpha = .2) +
   ylab(expression(beta[1])) +
   xlab("Date") +
   scale_x_date(date_breaks = "1 month", date_labels = "%y-%m-%d", expand = c(0.02, 0.02)) +
@@ -835,39 +836,16 @@ beta_1_d_plot <- res_beta_1_d %>%
     text = element_text(size = 8, family = "sans"),
     legend.box.margin = margin(-15, -15, -15, -15)
   ) +
-  scale_color_manual(values = c("L(ICU)" = wes_cols[13]))
+  scale_color_manual(values = c("RL(ICU)" = wes_cols[10]))
 beta_1_d_plot
 
 
 figS3 <- beta_0_plot + beta_1_b_plot + beta_1_d_plot +
-  plot_annotation( "A", "B", "C") +
+  plot_annotation(tag_levels = "A") +
   plot_layout( ncol = 1)
 figS3
 ggsave(paste0("./plots/figS3.png"), units = "in", dpi = 300, figS3, height = 3.9, width = 5.2)
 #ggsave(paste0("./plots/figS3.tiff"), units = "in", dpi = 300, figS3, height = 3.9, width = 5.2)
-
-
-
-res_beta_1_d <- read_csv("./results/summarized_results_and_tables/results_beta_1_mod_d.csv") %>% filter(date >= "2020-10-15", date <= "2021-05-15")
-figS4 <- res_beta_1_d %>%
-  ggplot(aes(x = date)) +
-  geom_line(aes(y = med_d, color = "RL(ICU)")) +
-  geom_ribbon(aes(date, ymin = q5_d, ymax = q95_d), fill = wes_cols[3], alpha = .2) +
-  ylab(expression(beta[1])) +
-  xlab("Date") +
-  scale_x_date(date_breaks = "1 month", expand = c(0.02, 0.02)) +
-  theme(
-    legend.background = element_blank(),
-    legend.position = "bottom",
-    legend.title = element_blank(),
-    text = element_text(size = 8, family = "sans"),
-    legend.box.margin = margin(-15, -15, -15, -15)
-  ) +
-  scale_color_manual(values = c("RL(ICU)" = wes_cols[3]))
-figS4
-
-ggsave("./plots/figS4.png", units = "in", dpi = 300, figS4, height = 2, width = 5.2)
-#ggsave("./plots/figS4.tiff", units = "in", dpi = 300, figS4, height = 2, width = 5.2)
 
 
 # S4 Plots of alternative leading indcators

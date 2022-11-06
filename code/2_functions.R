@@ -174,12 +174,12 @@ evaluate_nowcast <- function(dat, model, now, D_max = 35) {
     mutate(
       mean_7_c = rollmean(n_cases, k = 7, fill = NA, align = "center"),
       mean_7_c_lag = lag(mean_7_c, 7, fill = NA),
-      lead_ind_cases_l = lag(mean_7_c, 19, fill = NA),
+      lead_ind_cases_l = lag(mean_7_c, 18, fill = NA),
+      lead_ind_cases_rl = lag(mean_7_c - mean_7_c_lag, 11, fill = NA),
       mean_7_i = rollmean(n_icu, 7, fill = NA, align = "center"),
       mean_7_i_lag = lag(mean_7_i, 7, fill = NA),
       lead_ind_icu_l = lag(mean_7_i, 14, fill = NA),
-      lead_ind_icu_rl = lag((mean_7_i - mean_7_i_lag), 7, fill = NA),
-      lead_ind_cases_rl = lag(mean_7_c - mean_7_c_lag, 12, fill = NA)
+      lead_ind_icu_rl = lag((mean_7_i - mean_7_i_lag), 7, fill = NA)
     ) %>%
     filter(
       date <= now,

@@ -595,7 +595,7 @@ start <- now - D
 
 plot_dat <- dat %>%
   group_by(death_date, rep_date) %>%
-  summarise(n_true_retro = as.factor(n())) %>%
+  summarise(n_true_retro = as.factor(sum(n))) %>%
   mutate(
     delay = rep_date - death_date,
     Reported = case_when(
@@ -630,10 +630,10 @@ p1 <- plot_dat %>% ggplot(aes(x = as.numeric(delay), y = death_date)) +
   ) 
 
 p2 <- dat %>% group_by(date=death_date) %>%
-  summarise(n_true_retro=n()) %>%
+  summarise(n_true_retro=sum(n)) %>%
   left_join(dat %>% filter(rep_date <= now) %>% 
               group_by(date=death_date) %>%
-              summarise(n_obs=n())) %>%
+              summarise(n_obs=sum(n))) %>%
   mutate_if(is.integer, ~replace(., is.na(.), 0)) %>%
   filter(date >= start, date <= now) %>%
   mutate(unrep = n_true_retro-n_obs) %>% 
@@ -662,7 +662,7 @@ swe_rep <- p1 + p2 + plot_annotation(tag_levels = c("A", "B")) + plot_layout( nc
 
 swe_rep
 
-ggsave(paste0("./plots/figS1.png"), units = "in", dpi = 300, swe_rep, height = 5, width = 5.2)
+ggsave(paste0("./plots/figS1.png"), units = "in", dpi = 300, swe_rep, height = 5.5, width = 5.2)
 #ggsave(paste0("./plots/figS1.tiff"), units = "in", dpi = 300, swe_rep, height = 4, width = 5.2, compression = "lzw")
 
 

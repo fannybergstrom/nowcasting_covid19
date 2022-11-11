@@ -52,7 +52,7 @@ obs_plot <- dat %>%
 obs_plot
 
 ggsave(paste0("./plots/fig1.png"), units = "in", dpi = 300, obs_plot, height = 3.5, width = 5.2)
-#ggsave(paste0("./plots/fig1.tiff"), units = "in", dpi = 300, obs_plot, height = 3.5, width = 5.2, compression = "lzw")
+ggsave(paste0("./plots/tiff/fig1.tiff"), units = "in", dpi = 300, obs_plot, height = 3.5, width = 5.2, compression = "lzw")
 
 
 # Fig 2
@@ -136,7 +136,7 @@ timeseries_plots <- ts %>%
 timeseries_plots
 
 ggsave(paste0("./plots/fig2.png"), units = "in", dpi = 300, timeseries_plots, height = 3.1, width = 5.2)
-#ggsave(paste0("./plots/fig2.tiff"), units = "in", dpi = 300, timeseries_plots, height = 3.1, width = 5.2, compression = "lzw")
+ggsave(paste0("./plots/tiff/fig2.tiff"), units = "in", dpi = 300, timeseries_plots, height = 3.1, width = 5.2, compression = "lzw")
 
 # Fig 3 is a Tikz figure
 
@@ -353,7 +353,7 @@ fig4 <- {snap_res_a + q_plot_a_30 + plot_layout(tag_level = 'new')} /
 
 fig4
 ggsave(paste0("./plots/fig4.png"), units = "in", dpi = 300, fig4, height = 6.8, width = 5.2)
-#ggsave(paste0("./plots/fig4.tiff"), units = "in", dpi = 300, fig4, height = 6.8, width = 5.2)
+ggsave(paste0("./plots/tiff/fig4.tiff"), units = "in", dpi = 300, fig4, height = 6.8, width = 5.2)
 
 # Fig 5
 err_delay <- read_csv("./results/summarized_results_and_tables/error_by_delay.csv") %>% as.data.frame()
@@ -424,7 +424,7 @@ fig5 <- crps_plot + log_plot +
 
 fig5
 ggsave(paste0("./plots/fig5.png"), units = "in", dpi = 300, fig5, height = 2.5, width = 5.2)
-#ggsave(paste0("./plots/fig5.tiff"), units = "in", dpi = 300, figS2, height = 2.5, width = 5.2)
+ggsave(paste0("./plots/tiff/fig5.tiff"), units = "in", dpi = 300, fig5, height = 2.5, width = 5.2)
 
 
 # Fig 6
@@ -496,7 +496,7 @@ fig6 <- rep_plot_a + rep_plot_b + rep_plot_d +
 
 fig6
 ggsave(paste0("./plots/fig6.png"), units = "in", dpi = 300, fig6, height = 5.8, width = 5.2)
-#ggsave(paste0("./plots/fig6.tiff"), units = "in", dpi = 300, fig6, height = 5.8, width = 5.2)
+ggsave(paste0("./plots/tiff/fig6.tiff"), units = "in", dpi = 300, fig6, height = 5.8, width = 5.2)
 
 # Fig 7
 dates <- c(as.Date("2020-11-01"), as.Date("2021-01-01"), as.Date("2021-03-01"), as.Date("2021-05-01"))
@@ -572,7 +572,7 @@ fig7 <- log_plot_7 + crps_plot_7 + plot_annotation(tag_levels = c("A", "B")) +
 
 fig7
 ggsave(paste0("./plots/fig7.png"), units = "in", dpi = 300, fig7, height = 3.5, width = 5.2)
-#ggsave(paste0("./plots/fig7.tiff"), units = "in", dpi = 300, fig7, height = 3.5, width = 5.2)
+ggsave(paste0("./plots/tiff/fig7.tiff"), units = "in", dpi = 300, fig7, height = 3.5, width = 5.2)
 
 
 
@@ -663,7 +663,7 @@ swe_rep <- p1 + p2 + plot_annotation(tag_levels = c("A", "B")) + plot_layout( nc
 swe_rep
 
 ggsave(paste0("./plots/figS1.png"), units = "in", dpi = 300, swe_rep, height = 5.5, width = 5.2)
-#ggsave(paste0("./plots/figS1.tiff"), units = "in", dpi = 300, swe_rep, height = 4, width = 5.2, compression = "lzw")
+#ggsave(paste0("./plots/tiff/figS1.tiff"), units = "in", dpi = 300, swe_rep, height = 5.5, width = 5.2, compression = "lzw")
 
 
 # Fig S2
@@ -776,7 +776,7 @@ figS2 <- plot_emp_1230 + plot_est_a_1230 +
 figS2
 
 ggsave(paste0("./plots/figS2.png"), units = "in", dpi = 300, figS2, height = 4, width = 5.2)
-#ggsave(paste0("./plots/figS2.tiff"), units = "in", dpi = 300, figS1, height = 4, width = 5.2)
+#ggsave(paste0("./plots/tiff/figS2.tiff"), units = "in", dpi = 300, figS2, height = 4, width = 5.2)
 
 
 # Fig S3 (beta)
@@ -845,7 +845,7 @@ figS3 <- beta_0_plot + beta_1_b_plot + beta_1_d_plot +
   plot_layout( ncol = 1)
 figS3
 ggsave(paste0("./plots/figS3.png"), units = "in", dpi = 300, figS3, height = 5.8, width = 5.2)
-#ggsave(paste0("./plots/figS3.tiff"), units = "in", dpi = 300, figS3, height = 3.9, width = 5.2)
+#ggsave(paste0("./plots/figS3.tiff"), units = "in", dpi = 300, figS3, height = 5.8, width = 5.2)
 
 
 # S4 Plots of alternative leading indcators
@@ -912,7 +912,7 @@ figS4 <- rep_plot_dc + rep_plot_dic +
   plot_layout( ncol = 1)
 figS4
 ggsave(paste0("./plots/figS4.png"), units = "in", dpi = 300, figS2, height = 3.9, width = 5.2)
-#ggsave(paste0("./plots/figS4.tiff"), units = "in", dpi = 300, figS2, height = 3.9, width = 5.2)
+#ggsave(paste0("./plots/tiff/figS4.tiff"), units = "in", dpi = 300, figS2, height = 3.9, width = 5.2)
 
 
 # FigS1 RMSE
@@ -947,7 +947,7 @@ rmse7_plot <- res_df %>%
 rmse7_plot
 
 ggsave(paste0("./plots/S1_fig.png"), units = "in", dpi = 300, rmse7_plot, height = 1.75, width = 5.2)
-#ggsave(paste0("./plots/S1_fig.tiff"), units = "in", dpi = 300, rmse7_plot, height = 1.75, width = 5.2)
+ggsave(paste0("./plots/tiff/S1_fig.tiff"), units = "in", dpi = 300, rmse7_plot, height = 1.75, width = 5.2)
 
 
 

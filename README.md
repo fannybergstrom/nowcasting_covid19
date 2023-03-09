@@ -2,7 +2,7 @@
 
 This repository contains data and code for the article *Flexible Bayesian Nowcasting with application to COVID-19 fatalities in Sweden* by Fanny Bergström, Felix Günther, Michael Höhle and Tom Britton at Stockholm University. The artice is published in [PLOS Comp Bio](https://doi.org/10.1371/journal.pcbi.1010767).
 
-Weekly updated nowcast estimates of COVID-19 fatalities and ICU admissions in Sweden using our proposed method are found at 
+Monthly updated nowcast estimates of COVID-19 fatalities and ICU admissions in Sweden using our proposed method are found at 
 <p align="center">
   https://staff.math.su.se/fanny.bergstrom/covid19-nowcasting.
 </p>
